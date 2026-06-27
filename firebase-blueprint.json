@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "Portfolio": {
+      "title": "Portfolio Settings",
+      "description": "Admin's portfolio profile, bio, skills, experience, and social links",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name" },
+        "title": { "type": "string", "description": "Professional title" },
+        "bio": { "type": "string", "description": "Short bio or tagline" },
+        "aboutMe": { "type": "string", "description": "Detailed about section" },
+        "profilePhoto": { "type": "string", "description": "URL of profile photo" },
+        "coverImage": { "type": "string", "description": "URL of cover image" },
+        "skills": { "type": "array", "description": "Array of skill strings" },
+        "experience": { "type": "array", "description": "Work/project history details" },
+        "socialLinks": { "type": "object", "description": "Social media links" }
+      },
+      "required": ["name", "title", "bio"]
+    },
+    "Website": {
+      "title": "Website Project",
+      "description": "Showcase details for a hosted web app or website",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the website" },
+        "description": { "type": "string", "description": "Short or long description" },
+        "category": { "type": "string", "description": "Category of the app" },
+        "url": { "type": "string", "description": "Link to visit" },
+        "screenshot": { "type": "string", "description": "Main thumbnail/screenshot URL" },
+        "bannerImage": { "type": "string", "description": "Banner cover image URL" },
+        "featured": { "type": "boolean", "description": "Pinned at top if true" },
+        "rating": { "type": "number", "description": "Admin rating out of 5" },
+        "views": { "type": "number", "description": "Total view count" },
+        "clicks": { "type": "number", "description": "Total visit/click count" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "screenshots": { "type": "array", "description": "Optional extra screenshot URLs" }
+      },
+      "required": ["name", "description", "category", "url"]
+    },
+    "App": {
+      "title": "Mobile App Project",
+      "description": "Showcase details and APK download for mobile/software application",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the application" },
+        "description": { "type": "string", "description": "Short or long description" },
+        "category": { "type": "string", "description": "App category" },
+        "icon": { "type": "string", "description": "Icon URL" },
+        "apkUrl": { "type": "string", "description": "Download link for APK file" },
+        "version": { "type": "string", "description": "App version (e.g. v1.0.0)" },
+        "size": { "type": "string", "description": "File size (e.g. 15.4 MB)" },
+        "changelog": { "type": "string", "description": "Release notes / updates list" },
+        "featured": { "type": "boolean", "description": "Featured toggle" },
+        "rating": { "type": "number", "description": "Admin rating" },
+        "downloads": { "type": "number", "description": "Total download count" },
+        "views": { "type": "number", "description": "Total view count" },
+        "releaseDate": { "type": "string", "format": "date" },
+        "updateDate": { "type": "string", "format": "date" },
+        "screenshots": { "type": "array", "description": "List of screenshot URLs" },
+        "banner": { "type": "string", "description": "Banner image URL" }
+      },
+      "required": ["name", "description", "category", "version", "size"]
+    },
+    "Contact": {
+      "title": "Contact Submission",
+      "description": "User feedback and message inbox entries for the admin",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["name", "email", "message"]
+    },
+    "Roadmap": {
+      "title": "Project Roadmap",
+      "description": "List of planned features and updates for future projects",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["planned", "in_progress", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "status"]
+    },
+    "Announcement": {
+      "title": "Admin Announcement",
+      "description": "Global notices or announcements broadcasted by the admin",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "success"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type", "active"]
+    },
+    "Analytics": {
+      "title": "Site Analytics",
+      "description": "Counter logs for views, downloads, clicks, and daily unique visitors",
+      "type": "object",
+      "properties": {
+        "visitors": { "type": "number", "description": "Total unique visitors" },
+        "clicks": { "type": "number", "description": "Total global links clicked" },
+        "downloads": { "type": "number", "description": "Total global APK downloads" },
+        "views": { "type": "number", "description": "Total page views" },
+        "dailyLogs": { "type": "object", "description": "Keyed by YYYY-MM-DD: { visits, clicks, downloads }" }
+      },
+      "required": ["visitors", "clicks", "downloads", "views"]
+    }
+  },
+  "firestore": {
+    "/portfolio/main": {
+      "schema": "Portfolio",
+      "description": "Single record containing all owner profile and social data"
+    },
+    "/websites/{websiteId}": {
+      "schema": "Website",
+      "description": "List of web applications and links showcased"
+    },
+    "/apps/{appId}": {
+      "schema": "App",
+      "description": "List of mobile APK projects and desktop tools showcased"
+    },
+    "/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "Messages from the public contact form"
+    },
+    "/roadmap/{roadmapId}": {
+      "schema": "Roadmap",
+      "description": "Future updates and feature releases track"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Global notification messages displayed on top of the site"
+    },
+    "/analytics/stats": {
+      "schema": "Analytics",
+      "description": "Global visitor and action tracking record"
+    }
+  }
+}
