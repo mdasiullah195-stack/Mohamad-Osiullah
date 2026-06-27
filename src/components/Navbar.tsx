@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings, Printer } from 'lucide-react';
+import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { Language, translations } from '../utils/translations';
 
@@ -132,29 +132,17 @@ export default function Navbar({
 
           {/* Action Icons Section */}
           <div className="flex items-center gap-2">
-            {/* Download Resume/Portfolio Print Trigger */}
-            <button
-              onClick={() => window.print()}
-              className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center gap-1.5"
-              aria-label="Download Resume"
-              title="Download Resume / Portfolio Highlights PDF"
-              id="nav-resume-print-btn"
-            >
-              <Printer className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span className="hidden xl:inline text-xs font-semibold text-gray-600 dark:text-slate-300">{t.resumePdf}</span>
-            </button>
-
             {/* Language Switcher Toggle */}
             <button
-              onClick={() => onLanguageChange(language === 'EN' ? 'ES' : 'EN')}
+              onClick={() => onLanguageChange(language === 'EN' ? 'NE' : 'EN')}
               className="p-1.5 px-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all font-mono text-xs font-bold border border-gray-200/60 dark:border-slate-800/80 flex items-center gap-1 shadow-sm shrink-0"
               aria-label="Toggle Language"
-              title="Toggle Language EN / ES"
+              title="Toggle Language EN / NE"
               id="language-toggle-btn"
             >
               <span className={language === 'EN' ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'opacity-60'}>EN</span>
               <span className="opacity-40">/</span>
-              <span className={language === 'ES' ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'opacity-60'}>ES</span>
+              <span className={language === 'NE' ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'opacity-60'}>NE</span>
             </button>
 
             {/* Dark Mode Switcher */}
@@ -253,23 +241,10 @@ export default function Navbar({
             </button>
           ))}
 
-          {/* Download Resume Button for Mobile */}
-          <button
-            onClick={() => {
-              setMobileMenuOpen(false);
-              window.print();
-            }}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-2"
-            id="mobile-resume-print-btn"
-          >
-            <Printer className="w-4 h-4" />
-            <span>{t.downloadResumePdf}</span>
-          </button>
-
           {/* Language Switcher Button for Mobile */}
           <button
             onClick={() => {
-              onLanguageChange(language === 'EN' ? 'ES' : 'EN');
+              onLanguageChange(language === 'EN' ? 'NE' : 'EN');
               setMobileMenuOpen(false);
             }}
             className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-2"
@@ -278,7 +253,7 @@ export default function Navbar({
             <span className="font-mono text-xs border border-gray-300 dark:border-slate-700 px-1.5 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
               {language}
             </span>
-            <span>Toggle Language (EN / ES)</span>
+            <span>Toggle Language (EN / NE)</span>
           </button>
 
         </div>

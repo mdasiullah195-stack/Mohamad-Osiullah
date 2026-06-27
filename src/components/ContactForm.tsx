@@ -10,7 +10,8 @@ export default function ContactForm() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const language = (localStorage.getItem('portfolio_lang') as Language) || 'EN';
+  const storedLang = localStorage.getItem('portfolio_lang');
+  const language = (storedLang === 'EN' || storedLang === 'NE' ? storedLang : 'EN') as Language;
   const t = translations[language];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

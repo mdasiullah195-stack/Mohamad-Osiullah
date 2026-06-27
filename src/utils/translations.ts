@@ -1,4 +1,4 @@
-export type Language = 'EN' | 'ES';
+export type Language = 'EN' | 'NE';
 
 export const translations = {
   EN: {
@@ -17,6 +17,8 @@ export const translations = {
     // Hero
     galleryTitle: "Digital Showcase",
     gallerySub: "Curated web applications, mobile software, and tools.",
+    latestAnnouncements: "Latest Announcements",
+    latestAnnouncementsDesc: "Stay updated with recent news, system alerts, and platform releases.",
     
     // Website section
     webShowcase: "Curated Web Applications",
@@ -59,62 +61,64 @@ export const translations = {
     within24h: "Within 24 Hours",
     backToTop: "Back to Top"
   },
-  ES: {
-    portfolioHub: "Centro de Portafolio",
-    home: "Inicio",
-    websites: "Sitios Web",
-    apps: "Aplicaciones",
-    roadmap: "Hoja de Ruta",
-    contactMe: "Contáctame",
-    adminPanel: "Panel de Admin",
-    searchPlaceholder: "Buscar apps, herramientas, web...",
-    searchProjects: "Buscar proyectos...",
-    resumePdf: "Currículum PDF",
-    downloadResumePdf: "Descargar Currículum PDF",
+  NE: {
+    portfolioHub: "पोर्टफोलियो हब",
+    home: "गृहपृष्ठ",
+    websites: "वेबसाइटहरू",
+    apps: "एपहरू",
+    roadmap: "रोडम्याप",
+    contactMe: "सम्पर्क गर्नुहोस",
+    adminPanel: "एडमिन प्यानल",
+    searchPlaceholder: "एपहरू, उपकरणहरू, वेब खोज्नुहोस्...",
+    searchProjects: "परियोजनाहरू खोज्नुहोस्...",
+    resumePdf: "बायोडाटा PDF",
+    downloadResumePdf: "बायोडाटा PDF डाउनलोड गर्नुहोस्",
     
     // Hero
-    galleryTitle: "Galería Digital",
-    gallerySub: "Aplicaciones web seleccionadas, software móvil y herramientas.",
+    galleryTitle: "डिजिटल शोकेश",
+    gallerySub: "चयन गरिएका वेब एप्लिकेसनहरू, मोबाइल सफ्टवेयर र उपकरणहरू।",
+    latestAnnouncements: "भर्खरैका घोषणाहरू",
+    latestAnnouncementsDesc: "भर्खरका समाचारहरू, प्रणाली सूचनाहरू, र प्लेटफर्म अपडेटहरूको जानकारी राख्नुहोस्।",
     
     // Website section
-    webShowcase: "Aplicaciones Web Seleccionadas",
-    webShowcaseDesc: "Despliegues interactivos en la nube y software de frontend diseñados con adaptabilidad y alta fidelidad.",
-    noWebsites: "No se encontraron sitios web que coincidan con su búsqueda.",
+    webShowcase: "चयन गरिएका वेब एप्लिकेसनहरू",
+    webShowcaseDesc: "रेस्पोन्सिभ र उच्च गुणस्तरका साथ डिजाइन गरिएका अन्तरक्रियात्मक क्लाउड डिप्लोइमेन्ट र फ्रन्टएन्ड सफ्टवेयर।",
+    noWebsites: "तपाईको फिल्टरसँग मिल्ने कुनै वेबसाइट फेला परेन।",
     
     // App section
-    appShowcase: "Software Móvil Compilado",
-    appShowcaseDesc: "Paquetes APK nativos de Android y herramientas móviles diseñadas para rendimiento, descarga directa y tiempos de ejecución locales.",
-    noApps: "No se encontraron aplicaciones móviles que coincidan con su búsqueda.",
+    appShowcase: "कम्पाइल गरिएका मोबाइल सफ्टवेयर",
+    appShowcaseDesc: "प्रदर्शन, प्रत्यक्ष डाउनलोड, र स्थानीय रनटाईमका लागि निर्मित नेटिभ एन्ड्रोइड APK प्याकेजहरू र मोबाइल उपकरणहरू।",
+    noApps: "तपाईको खोजसँग मिल्ने कुनै मोबाइल एप फेला परेन।",
     
     // Roadmap section
-    futureRoadmap: "Próximos Lanzamientos e Hitos",
-    roadmapDesc: "Seguimiento de integración continua de las próximas herramientas, funciones, migraciones de bases de datos y lanzamientos estructurales.",
+    futureRoadmap: "आगामी रिलीज र माइलस्टोनहरू",
+    roadmapDesc: "आगामी उपकरणहरू, सुविधाहरू, डाटाबेस माइग्रेसनहरू, र संरचनात्मक रिलीजहरूको ट्र्याकिङ।",
     
     // Contact Form
-    letsCreate: "Creemos Juntos",
-    contactDesc: "Envíe sus consultas, comentarios, solicitudes de aplicaciones o colaboraciones técnicas. Leeré y responderé lo antes posible.",
-    fullName: "Nombre Completo *",
-    emailAddr: "Dirección de Correo *",
-    message: "Mensaje *",
-    sendMessage: "Enviar Mensaje",
-    sending: "Enviando Envío...",
-    messageSent: "¡Mensaje Enviado!",
-    messageSuccess: "Gracias. Su consulta ha sido entregada de forma segura. Revisaré mi panel de administración.",
-    failedSend: "No se pudo enviar el mensaje. Inténtelo de nuevo.",
+    letsCreate: "सँगै निर्माण गरौं",
+    contactDesc: "कुनै पनि सोधपुछ, प्रतिक्रिया, एप अनुरोध, वा प्राविधिक सहकार्य पठाउनुहोस्। म सकेसम्म चाँडो पढेर प्रतिक्रिया दिनेछु।",
+    fullName: "पूरा नाम *",
+    emailAddr: "इमेल ठेगाना *",
+    message: "सन्देश *",
+    sendMessage: "सन्देश पठाउनुहोस्",
+    sending: "पठाउँदै...",
+    messageSent: "सन्देश पठाइयो!",
+    messageSuccess: "धन्यवाद। तपाईको सन्देश सुरक्षित रूपमा डेलिभर भएको छ। म एडमिन प्यानल इनबक्समा जाँच गर्नेछु।",
+    failedSend: "सन्देश पठाउन असफल भयो। कृपया पुन: प्रयास गर्नुहोस्।",
     
     // Newsletter
-    subscribeTitle: "Suscribirse a Lanzamientos",
-    subscribeDesc: "Obtenga actualizaciones instantáneas cada vez que publique nuevas aplicaciones web o paquetes compilados de Android.",
-    subscribeBtn: "Suscribirse",
-    subscribedSuccess: "¡Suscrito con éxito! Gracias.",
-    invalidEmail: "Por favor introduzca una dirección de correo válida.",
+    subscribeTitle: "नयाँ रिलीजहरूको लागि सदस्यता लिनुहोस्",
+    subscribeDesc: "मैले नयाँ वेब एप्लिकेसनहरू वा कम्पाइल गरिएका एन्ड्रोइड प्याकेजहरू रिलीज गर्दा तत्काल अपडेटहरू पाउनुहोस्।",
+    subscribeBtn: "सदस्यता लिनुहोस्",
+    subscribedSuccess: "सफलतापूर्वक सदस्यता लिइयो! धन्यवाद।",
+    invalidEmail: "कृपया मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस्।",
     
     // Other
-    getInTouch: "Póngase en contacto directamente",
-    getInTouchDesc: "¿Tiene una solicitud de desarrollo web personalizado o una aplicación nativa de Android? ¿Busca integrar infraestructura en la nube, configurar estructuras de bases de datos seguras o establecer interacciones de interfaz de usuario de alta fidelidad? Envíeme una consulta instantánea.",
-    primaryEmail: "Correo Principal",
-    targetResponse: "Respuesta Estimada",
-    within24h: "Dentro de 24 Horas",
-    backToTop: "Volver arriba"
+    getInTouch: "सिधै सम्पर्कमा आउनुहोस्",
+    getInTouchDesc: "अनुकूल वेब विकास वा नेटिभ एन्ड्रोइड एप अनुरोध छ? क्लाउड पूर्वाधार एकीकृत गर्न, सुरक्षित डाटाबेस संरचनाहरू सेट अप गर्न, वा उच्च गुणस्तर UI अन्तरक्रियाहरू स्थापित गर्न चाहनुहुन्छ? मलाई तत्काल सोधपुछ पठाउनुहोस्।",
+    primaryEmail: "प्राथमिक इमेल",
+    targetResponse: "प्रतिक्रिया समय",
+    within24h: "२४ घण्टा भित्र",
+    backToTop: "माथि जानुहोस्"
   }
 };

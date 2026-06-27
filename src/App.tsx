@@ -62,7 +62,7 @@ import Footer from './components/Footer';
 import LoginModal from './components/LoginModal';
 
 // Icons
-import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search } from 'lucide-react';
+import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search, Megaphone, Bell, Info, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 // Framer Motion staggered animation configurations
 const gridContainerVariants = {
@@ -136,7 +136,11 @@ export default function App() {
 
   // Language switcher state
   const [language, setLanguage] = useState<Language>(() => {
-    return (localStorage.getItem('portfolio_lang') as Language) || 'EN';
+    const stored = localStorage.getItem('portfolio_lang');
+    if (stored === 'EN' || stored === 'NE') {
+      return stored as Language;
+    }
+    return 'EN';
   });
 
   useEffect(() => {
@@ -978,6 +982,93 @@ export default function App() {
               onNavigate={handleNavigate} 
             />
           </div>
+
+          {/* LATEST ANNOUNCEMENTS SECTION */}
+          {announcements.filter(a => a.active).length > 0 && !searchQuery && (
+            <section className="py-12 bg-indigo-50/30 dark:bg-slate-900/30 border-b border-gray-150 dark:border-slate-800/40 relative">
+              <div className="absolute top-0 right-1/4 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono tracking-widest uppercase flex items-center gap-1.5">
+                      <Megaphone className="w-4 h-4 text-indigo-500 animate-bounce" />
+                      <span>{t.latestAnnouncements}</span>
+                    </span>
+                    <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-900 dark:text-white mt-1">
+                      {t.latestAnnouncements}
+                    </h2>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">
+                    {t.latestAnnouncementsDesc}
+                  </p>
+                </div>
+
+                {/* Announcement Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {announcements.filter(a => a.active).map((ann) => {
+                    let typeBg = 'bg-white dark:bg-slate-900 border-gray-150 dark:border-slate-800/60';
+                    let typeIcon = <Bell className="w-5 h-5 text-indigo-500" />;
+                    let typeAccent = 'border-l-4 border-l-indigo-500';
+
+                    if (ann.type === 'success') {
+                      typeBg = 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30';
+                      typeIcon = <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
+                      typeAccent = 'border-l-4 border-l-emerald-500';
+                    } else if (ann.type === 'warning') {
+                      typeBg = 'bg-amber-50/30 dark:bg-amber-950/10 border-amber-100 dark:border-amber-900/30';
+                      typeIcon = <AlertTriangle className="w-5 h-5 text-amber-500" />;
+                      typeAccent = 'border-l-4 border-l-amber-500';
+                    } else if (ann.type === 'info') {
+                      typeBg = 'bg-sky-50/30 dark:bg-sky-950/10 border-sky-100 dark:border-sky-900/30';
+                      typeIcon = <Info className="w-5 h-5 text-sky-500" />;
+                      typeAccent = 'border-l-4 border-l-sky-500';
+                    }
+
+                    return (
+                      <div 
+                        key={ann.id} 
+                        className={`p-6 rounded-2xl border ${typeBg} ${typeAccent} shadow-sm hover:shadow-md transition-all duration-300 flex gap-4`}
+                      >
+                        <div className="p-2 bg-slate-100/55 dark:bg-slate-800/60 rounded-xl h-fit">
+                          {typeIcon}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-display font-bold text-base text-slate-850 dark:text-slate-100">
+                              {ann.title}
+                            </h3>
+                            {ann.createdAt && (
+                              <span className="text-[11px] font-mono font-medium text-slate-400 dark:text-slate-500 bg-slate-100/70 dark:bg-slate-800/50 px-2 py-0.5 rounded-md">
+                                {(() => {
+                                  try {
+                                    const dateObj = (ann.createdAt as any)?.seconds 
+                                      ? new Date((ann.createdAt as any).seconds * 1000) 
+                                      : new Date(ann.createdAt);
+                                    return dateObj.toLocaleDateString(language === 'EN' ? 'en-US' : 'ne-NP', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    });
+                                  } catch (err) {
+                                    return '';
+                                  }
+                                })()}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 font-sans leading-relaxed">
+                            {ann.message}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* DYNAMIC SCROLL TRANSITIONS REVEAL SECTIONS */}
           

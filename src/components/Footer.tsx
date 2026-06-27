@@ -16,7 +16,8 @@ export default function Footer({ portfolio, onNavigate, logo }: FooterProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
 
-  const language = (localStorage.getItem('portfolio_lang') as Language) || 'EN';
+  const storedLang = localStorage.getItem('portfolio_lang');
+  const language = (storedLang === 'EN' || storedLang === 'NE' ? storedLang : 'EN') as Language;
   const t = translations[language];
 
   const handleSubscribe = async (e: React.FormEvent) => {
