@@ -74,7 +74,17 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
         onViewDetails(project, type);
         onIncrementCount(project.id, type, 'views');
       }}
-      className="group relative flex flex-col h-full rounded-2xl glass hover:shadow-xl dark:hover:shadow-slate-900/30 transition-all duration-300 border border-gray-200/50 dark:border-slate-800/60 cursor-pointer overflow-hidden transform hover:-translate-y-1.5"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onViewDetails(project, type);
+          onIncrementCount(project.id, type, 'views');
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`View details for ${project.name}`}
+      className="group relative flex flex-col h-full rounded-2xl glass hover:shadow-xl dark:hover:shadow-slate-900/30 transition-all duration-300 border border-gray-200/50 dark:border-slate-800/60 cursor-pointer overflow-hidden transform hover:-translate-y-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/80 dark:focus:ring-indigo-400/80"
       id={`project-card-${type}-${project.id}`}
     >
       
@@ -226,3 +236,53 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
     </div>
   );
 }
+
+export function ProjectCardSkeleton() {
+  return (
+    <div className="relative flex flex-col h-[400px] rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-gray-200/50 dark:border-slate-800/60 overflow-hidden animate-pulse">
+      {/* Image Block Skeleton */}
+      <div className="h-36 sm:h-40 w-full bg-slate-200/60 dark:bg-slate-800/60" />
+      
+      {/* Content Skeleton */}
+      <div className="flex-1 p-5 flex flex-col justify-between">
+        <div className="space-y-4">
+          {/* Rating Block Skeleton */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-1">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="w-3 h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded-full" />
+              ))}
+            </div>
+            <div className="w-14 h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+          </div>
+
+          {/* Icon & Title Row Skeleton */}
+          <div className="flex gap-3 items-start">
+            <div className="w-10 h-10 rounded-lg bg-slate-200/60 dark:bg-slate-800/60 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 bg-slate-200/60 dark:bg-slate-800/60 rounded w-3/4" />
+              <div className="h-3.5 bg-slate-200/60 dark:bg-slate-800/60 rounded w-1/3" />
+            </div>
+          </div>
+
+          {/* Description Lines Skeleton */}
+          <div className="space-y-2 mt-4">
+            <div className="h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded w-full" />
+            <div className="h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded w-5/6" />
+          </div>
+        </div>
+
+        {/* Action Row Skeleton */}
+        <div className="space-y-4 mt-6">
+          <div className="h-px bg-slate-200/40 dark:bg-slate-800/40" />
+          <div className="grid grid-cols-12 gap-2">
+            <div className="col-span-8 h-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+            <div className="col-span-2 h-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+            <div className="col-span-2 h-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

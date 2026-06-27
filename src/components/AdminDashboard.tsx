@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   BarChart, 
   Database, 
@@ -86,6 +87,7 @@ export default function AdminDashboard({
 }: AdminDashboardProps) {
   
   const [activeTab, setActiveTab] = useState<'analytics' | 'portfolio' | 'websites' | 'apps' | 'roadmap' | 'announcements' | 'messages'>('analytics');
+  const [sidebarMobileExpanded, setSidebarMobileExpanded] = useState(false);
 
   // Sub-state for lists / add forms
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -120,12 +122,59 @@ export default function AdminDashboard({
     setProfileForm({ ...portfolio });
   }, [portfolio]);
 
-  // File to Base64 utility
+  // File to Base64 utility with canvas-based client-side image compression
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // If the file is not an image (e.g. Android APK binaries), return raw Base64
+      if (!file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+        return;
+      }
+
+      // For images, load into an Image object and draw onto an HTML5 Canvas to compress
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_DIM = 800; // Perfect display resolution for portfolio grids / modals
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Export as compressed JPEG at 0.75 quality for great visual balance and tiny file footprints
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+            resolve(compressedBase64);
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => {
+          resolve(event.target?.result as string);
+        };
+      };
       reader.onerror = (error) => reject(error);
     });
   };
@@ -722,41 +771,70 @@ export default function AdminDashboard({
         </div>
       </div>
 
-      {/* Main Tabs and Content Wrapper */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Explicitly structured layout wrapper separating navigation and main workspace content */}
+      <div className="flex flex-col lg:flex-row gap-8 items-start relative w-full animate-fade-in" id="admin-layout-wrapper">
         
-        {/* Navigation Sidebar */}
-        <div className="lg:col-span-3 space-y-2">
-          {[
-            { id: 'analytics', label: 'Analytics Board', icon: <BarChart className="w-4 h-4" /> },
-            { id: 'portfolio', label: 'Owner Portfolio', icon: <User className="w-4 h-4" /> },
-            { id: 'websites', label: 'Web Directory', icon: <Globe className="w-4 h-4" /> },
-            { id: 'apps', label: 'App Catalog', icon: <Smartphone className="w-4 h-4" /> },
-            { id: 'roadmap', label: 'Future Roadmap', icon: <Calendar className="w-4 h-4" /> },
-            { id: 'announcements', label: 'Announcement Board', icon: <Megaphone className="w-4 h-4" /> },
-            { id: 'messages', label: `Inquiries (${contacts.filter(c=>!c.read).length})`, icon: <Mail className="w-4 h-4" /> }
-          ].map((tab) => (
+        {/* Navigation Sidebar Panel with Explicit Separation and smooth transitions */}
+        <motion.div 
+          className="w-full lg:w-64 shrink-0 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-2xl border border-gray-200/50 dark:border-slate-800/60 p-3 lg:p-4 shadow-sm space-y-1.5 transition-all duration-300 relative z-10"
+          id="admin-sidebar"
+          layout
+        >
+          {/* Mobile Tab Title & Toggle Button */}
+          <div className="flex lg:hidden items-center justify-between px-2 pb-2 border-b border-gray-150 dark:border-slate-800/60 mb-2">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+              Navigation Menu
+            </span>
             <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as any);
-                setEditingId(null);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === tab.id
-                  ? 'bg-amber-500 text-white shadow-md'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50'
-              }`}
-              id={`admin-tab-btn-${tab.id}`}
+              type="button"
+              onClick={() => setSidebarMobileExpanded(!sidebarMobileExpanded)}
+              className="text-xs font-semibold px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg transition-all"
             >
-              {tab.icon}
-              <span>{tab.label}</span>
+              {sidebarMobileExpanded ? 'Close Menu' : 'Open Menu'}
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Form or List View Container */}
-        <div className="lg:col-span-9 glass p-6 sm:p-8 rounded-3xl border border-gray-200/50 dark:border-slate-800/60 min-h-[500px]">
+          <div className={`space-y-1 ${sidebarMobileExpanded ? 'block' : 'hidden lg:block'}`}>
+            {[
+              { id: 'analytics', label: 'Analytics Board', icon: <BarChart className="w-4 h-4" /> },
+              { id: 'portfolio', label: 'Owner Portfolio', icon: <User className="w-4 h-4" /> },
+              { id: 'websites', label: 'Web Directory', icon: <Globe className="w-4 h-4" /> },
+              { id: 'apps', label: 'App Catalog', icon: <Smartphone className="w-4 h-4" /> },
+              { id: 'roadmap', label: 'Future Roadmap', icon: <Calendar className="w-4 h-4" /> },
+              { id: 'announcements', label: 'Announcement Board', icon: <Megaphone className="w-4 h-4" /> },
+              { id: 'messages', label: `Inquiries (${contacts.filter(c=>!c.read).length})`, icon: <Mail className="w-4 h-4" /> }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setEditingId(null);
+                  setSidebarMobileExpanded(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all relative ${
+                  activeTab === tab.id
+                    ? 'text-white font-bold'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50'
+                }`}
+                id={`admin-tab-btn-${tab.id}`}
+              >
+                {activeTab === tab.id && (
+                  <motion.div
+                    layoutId="activeAdminTab"
+                    className="absolute inset-0 bg-amber-500 rounded-xl -z-10"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                {tab.icon}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Form or List View Container (Explicitly Separated Workspace Content Area) */}
+        <div className="flex-1 w-full glass p-6 sm:p-8 rounded-3xl border border-gray-200/50 dark:border-slate-800/60 min-h-[500px]">
           
           {/* 1. ANALYTICS BOARD */}
           {activeTab === 'analytics' && (

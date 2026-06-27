@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings } from 'lucide-react';
+import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings, Printer } from 'lucide-react';
 import { User } from 'firebase/auth';
+import { Language, translations } from '../utils/translations';
 
 interface NavbarProps {
   darkMode: boolean;
@@ -14,6 +15,8 @@ interface NavbarProps {
   onNavigate: (section: string) => void;
   currentSection: string;
   logo?: string;
+  language: Language;
+  onLanguageChange: (lang: Language) => void;
 }
 
 export default function Navbar({
@@ -27,17 +30,21 @@ export default function Navbar({
   setSearchQuery,
   onNavigate,
   currentSection,
-  logo
+  logo,
+  language,
+  onLanguageChange
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
+  const t = translations[language];
+
   const navItems = [
-    { id: 'home', label: 'Home' },
-    { id: 'websites', label: 'Websites' },
-    { id: 'apps', label: 'Apps' },
-    { id: 'roadmap', label: 'Roadmap' },
-    { id: 'contact', label: 'Contact Me' },
+    { id: 'home', label: t.home },
+    { id: 'websites', label: t.websites },
+    { id: 'apps', label: t.apps },
+    { id: 'roadmap', label: t.roadmap },
+    { id: 'contact', label: t.contactMe },
   ];
 
   return (
@@ -45,53 +52,56 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           
-          {/* Logo Section */}
-          <div 
-            className="flex items-center gap-3 cursor-pointer shrink-0"
-            onClick={() => onNavigate('home')}
-            id="nav-logo"
-          >
-            <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-indigo-600 bg-slate-900 shadow-md">
-              <img
-                src={logo || "/input_file_0.png"}
-                alt="Mohamad Osiullah Logo"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  // Fallback if logo fails to load
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-                }}
-              />
+          {/* Logo & Desktop Nav Links (PC Left-aligned Navigation) */}
+          <div className="flex items-center gap-6 shrink-0">
+            {/* Logo Section */}
+            <div 
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => onNavigate('home')}
+              id="nav-logo"
+            >
+              <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-indigo-600 bg-slate-900 shadow-md">
+                <img
+                  src={logo || "/input_file_0.png"}
+                  alt="Mohamad Osiullah Logo"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // Fallback if logo fails to load
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+                  }}
+                />
+              </div>
+              <div className="hidden md:block">
+                <span className="font-display font-bold text-base tracking-tight text-gray-900 dark:text-white block leading-none">
+                  Mohamad Osiullah
+                </span>
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono tracking-widest uppercase block mt-1">
+                  {t.portfolioHub}
+                </span>
+              </div>
             </div>
-            <div className="hidden md:block">
-              <span className="font-display font-bold text-base tracking-tight text-gray-900 dark:text-white block leading-none">
-                Mohamad Osiullah
-              </span>
-              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono tracking-widest uppercase block mt-1">
-                Portfolio Hub
-              </span>
-            </div>
-          </div>
 
-          {/* Desktop Nav Links */}
-          <div className="hidden lg:flex items-center gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  currentSection === item.id
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
-                    : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-slate-800/40'
-                }`}
-                id={`nav-link-${item.id}`}
-              >
-                {item.label}
-              </button>
-            ))}
+            {/* Desktop Nav Links */}
+            <div className="hidden lg:flex items-center gap-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onNavigate(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    currentSection === item.id
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
+                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-slate-800/40'
+                  }`}
+                  id={`nav-link-${item.id}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Search Box */}
@@ -101,7 +111,7 @@ export default function Navbar({
             </div>
             <input
               type="text"
-              placeholder="Search apps, tools, web..."
+              placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -122,6 +132,31 @@ export default function Navbar({
 
           {/* Action Icons Section */}
           <div className="flex items-center gap-2">
+            {/* Download Resume/Portfolio Print Trigger */}
+            <button
+              onClick={() => window.print()}
+              className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all shadow-sm flex items-center gap-1.5"
+              aria-label="Download Resume"
+              title="Download Resume / Portfolio Highlights PDF"
+              id="nav-resume-print-btn"
+            >
+              <Printer className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <span className="hidden xl:inline text-xs font-semibold text-gray-600 dark:text-slate-300">{t.resumePdf}</span>
+            </button>
+
+            {/* Language Switcher Toggle */}
+            <button
+              onClick={() => onLanguageChange(language === 'EN' ? 'ES' : 'EN')}
+              className="p-1.5 px-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all font-mono text-xs font-bold border border-gray-200/60 dark:border-slate-800/80 flex items-center gap-1 shadow-sm shrink-0"
+              aria-label="Toggle Language"
+              title="Toggle Language EN / ES"
+              id="language-toggle-btn"
+            >
+              <span className={language === 'EN' ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'opacity-60'}>EN</span>
+              <span className="opacity-40">/</span>
+              <span className={language === 'ES' ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'opacity-60'}>ES</span>
+            </button>
+
             {/* Dark Mode Switcher */}
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -193,7 +228,7 @@ export default function Navbar({
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search projects..."
+              placeholder={t.searchProjects}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm bg-gray-150 dark:bg-slate-800 border border-transparent focus:border-amber-500 rounded-lg text-gray-900 dark:text-white"
@@ -217,6 +252,34 @@ export default function Navbar({
               {item.label}
             </button>
           ))}
+
+          {/* Download Resume Button for Mobile */}
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              window.print();
+            }}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-2"
+            id="mobile-resume-print-btn"
+          >
+            <Printer className="w-4 h-4" />
+            <span>{t.downloadResumePdf}</span>
+          </button>
+
+          {/* Language Switcher Button for Mobile */}
+          <button
+            onClick={() => {
+              onLanguageChange(language === 'EN' ? 'ES' : 'EN');
+              setMobileMenuOpen(false);
+            }}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-2"
+            id="mobile-language-toggle-btn"
+          >
+            <span className="font-mono text-xs border border-gray-300 dark:border-slate-700 px-1.5 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
+              {language}
+            </span>
+            <span>Toggle Language (EN / ES)</span>
+          </button>
 
         </div>
       )}

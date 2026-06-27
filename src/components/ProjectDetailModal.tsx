@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Website, App } from '../types';
-import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode } from 'lucide-react';
+import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAndReassembleApk, downloadBase64File } from '../utils/apkDownloader';
 
@@ -15,6 +15,17 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [showQr, setShowQr] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = () => {
+    const directUrl = `${window.location.origin}${window.location.pathname}#${type}-${project.id}`;
+    navigator.clipboard.writeText(directUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy link:', err);
+    });
+  };
 
   if (!project || !type) return null;
 
@@ -375,20 +386,42 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
                     )}
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={handleShare}
-                      className="py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 text-xs font-semibold transition-all flex items-center justify-center gap-1"
+                      className="py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1"
                       id="modal-share-btn"
                     >
                       <Share2 className="w-3.5 h-3.5" />
-                      <span>Share Link</span>
+                      <span className="text-[10px] sm:text-xs">Share</span>
+                    </button>
+
+                    <button
+                      onClick={handleCopyLink}
+                      className={`py-2.5 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 ${
+                        copied 
+                          ? 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 font-bold' 
+                          : 'border-gray-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                      }`}
+                      id="modal-copy-link-btn"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-green-500 animate-bounce" />
+                          <span className="text-[10px] sm:text-xs text-green-600 dark:text-green-400">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span className="text-[10px] sm:text-xs">Copy Link</span>
+                        </>
+                      )}
                     </button>
                     
                     {/* QR Code Toggle button */}
                     <button
                       onClick={() => setShowQr(!showQr)}
-                      className={`py-2.5 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+                      className={`py-2.5 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 ${
                         showQr 
                           ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' 
                           : 'border-gray-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
@@ -396,7 +429,7 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
                       id="modal-qr-toggle-btn"
                     >
                       <QrCode className="w-3.5 h-3.5" />
-                      <span>{showQr ? 'Hide QR Code' : 'Show QR Code'}</span>
+                      <span className="text-[10px] sm:text-xs">{showQr ? 'Hide QR' : 'Show QR'}</span>
                     </button>
                   </div>
                 </div>

@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { Send, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import confetti from 'canvas-confetti';
+import { Language, translations } from '../utils/translations';
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const language = (localStorage.getItem('portfolio_lang') as Language) || 'EN';
+  const t = translations[language];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -35,6 +40,12 @@ export default function ContactForm() {
       });
       
       setStatus('success');
+      confetti({
+        particleCount: 150,
+        spread: 85,
+        origin: { y: 0.6 },
+        colors: ['#6366f1', '#a855f7', '#f59e0b', '#10b981', '#3b82f6']
+      });
       setFormData({ name: '', email: '', message: '' });
     } catch (error) {
       setStatus('error');
@@ -55,10 +66,10 @@ export default function ContactForm() {
       <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
 
       <h3 className="font-display font-extrabold text-2xl text-slate-900 dark:text-white mb-2">
-        Let's Create Together
+        {t.letsCreate}
       </h3>
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 font-sans">
-        Submit any inquiries, feedback, app requests, or technical collaborations. I'll read and respond as soon as possible.
+        {t.contactDesc}
       </p>
 
       {/* Status Messages */}
@@ -66,8 +77,8 @@ export default function ContactForm() {
         <div className="mb-5 p-4 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-900/30 rounded-2xl flex items-start gap-3 text-sm">
           <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
           <div>
-            <span className="font-bold block">Message Sent!</span>
-            <span>Thank you. Your inquiry has been delivered safely. I will check my admin panel inbox.</span>
+            <span className="font-bold block">{t.messageSent}</span>
+            <span>{t.messageSuccess}</span>
           </div>
         </div>
       )}
@@ -85,7 +96,7 @@ export default function ContactForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mb-1.5">
-            Full Name *
+            {t.fullName}
           </label>
           <input
             type="text"
@@ -102,7 +113,7 @@ export default function ContactForm() {
 
         <div>
           <label htmlFor="email" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mb-1.5">
-            Email Address *
+            {t.emailAddr}
           </label>
           <input
             type="email"
@@ -119,7 +130,7 @@ export default function ContactForm() {
 
         <div>
           <label htmlFor="message" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mb-1.5">
-            Message *
+            {t.message}
           </label>
           <textarea
             id="message"
@@ -143,12 +154,12 @@ export default function ContactForm() {
           {status === 'loading' ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Sending Submission...</span>
+              <span>{t.sending}</span>
             </>
           ) : (
             <>
               <Send className="w-4 h-4" />
-              <span>Send Message</span>
+              <span>{t.sendMessage}</span>
             </>
           )}
         </button>

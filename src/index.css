@@ -96,3 +96,50 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Print Media Styles for clean professional Resume generation */
+.print-only-resume {
+  display: none;
+}
+
+@media print {
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-family: "Inter", sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide screen-only interactive and visual elements */
+  nav,
+  footer,
+  #scroll-progress-bar,
+  #theme-toggle-navbar,
+  #admin-login-btn,
+  #back-to-top-btn,
+  button,
+  form,
+  .no-print,
+  .announcement-banner,
+  #empty-state-websites,
+  #empty-state-apps {
+    display: none !important;
+  }
+
+  /* Display the print-only resume */
+  .print-only-resume {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 40px !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Force browsers to render colored backgrounds / borders */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -112,6 +112,16 @@
         "dailyLogs": { "type": "object", "description": "Keyed by YYYY-MM-DD: { visits, clicks, downloads }" }
       },
       "required": ["visitors", "clicks", "downloads", "views"]
+    },
+    "Subscriber": {
+      "title": "Newsletter Subscriber",
+      "description": "Visitor emails subscribed to updates",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "subscribedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
     }
   },
   "firestore": {
@@ -142,6 +152,10 @@
     "/analytics/stats": {
       "schema": "Analytics",
       "description": "Global visitor and action tracking record"
+    },
+    "/subscribers/{subscriberId}": {
+      "schema": "Subscriber",
+      "description": "List of newsletter subscribers"
     }
   }
 }

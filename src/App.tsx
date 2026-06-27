@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   db, 
   auth, 
@@ -37,6 +38,7 @@ import {
 
 // APK Chunking utilities
 import { saveApkChunks, deleteApkChunks } from './utils/apkDownloader';
+import { Language, translations } from './utils/translations';
 
 // Seed Fallback Data
 import { 
@@ -51,7 +53,7 @@ import {
 import Navbar from './components/Navbar';
 import AnnouncementBanner from './components/AnnouncementBanner';
 import Hero from './components/Hero';
-import ProjectCard from './components/ProjectCard';
+import ProjectCard, { ProjectCardSkeleton } from './components/ProjectCard';
 import ProjectDetailModal from './components/ProjectDetailModal';
 import RoadmapSection from './components/RoadmapSection';
 import ContactForm from './components/ContactForm';
@@ -60,7 +62,32 @@ import Footer from './components/Footer';
 import LoginModal from './components/LoginModal';
 
 // Icons
-import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop } from 'lucide-react';
+import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search } from 'lucide-react';
+
+// Framer Motion staggered animation configurations
+const gridContainerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const gridItemVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.95 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 100,
+      damping: 15,
+    },
+  },
+};
 
 export default function App() {
   
@@ -75,6 +102,13 @@ export default function App() {
   // Section Navigation & Scroll Ref hooks
   const [currentSection, setCurrentSection] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  const currentSectionRef = useRef('home');
+  useEffect(() => {
+    currentSectionRef.current = currentSection;
+  }, [currentSection]);
 
   const homeRef = useRef<HTMLDivElement>(null);
   const websitesRef = useRef<HTMLDivElement>(null);
@@ -96,6 +130,20 @@ export default function App() {
   });
   const [websites, setWebsites] = useState<Website[]>([]);
   const [apps, setApps] = useState<MobileApp[]>([]);
+  const [websitesLoaded, setWebsitesLoaded] = useState<boolean>(false);
+  const [appsLoaded, setAppsLoaded] = useState<boolean>(false);
+  const loading = !websitesLoaded || !appsLoaded;
+
+  // Language switcher state
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('portfolio_lang') as Language) || 'EN';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('portfolio_lang', language);
+  }, [language]);
+
+  const t = translations[language];
   const [roadmap, setRoadmap] = useState<RoadmapItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -190,8 +238,10 @@ export default function App() {
           setWebsites([]);
         }
       }
+      setWebsitesLoaded(true);
     }, (err) => {
       setWebsites(defaultWebsites);
+      setWebsitesLoaded(true);
     });
 
     // 3. Listen to Apps
@@ -217,8 +267,10 @@ export default function App() {
           setApps([]);
         }
       }
+      setAppsLoaded(true);
     }, (err) => {
       setApps(defaultApps);
+      setAppsLoaded(true);
     });
 
     // 4. Listen to Roadmap Milestones
@@ -333,6 +385,39 @@ export default function App() {
     cleanObsoleteWelcomeAnnouncement();
   }, []);
 
+  // Handle direct links via URL hash
+  useEffect(() => {
+    if (websites.length > 0 || apps.length > 0) {
+      const handleHashChange = () => {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#')) {
+          const parts = hash.substring(1).split('-');
+          if (parts.length >= 2) {
+            const type = parts[0];
+            const id = parts.slice(1).join('-');
+            if (type === 'website') {
+              const found = websites.find(w => w.id === id);
+              if (found) {
+                setSelectedProject(found);
+                setSelectedType('website');
+              }
+            } else if (type === 'app') {
+              const found = apps.find(a => a.id === id);
+              if (found) {
+                setSelectedProject(found);
+                setSelectedType('app');
+              }
+            }
+          }
+        }
+      };
+
+      handleHashChange();
+      window.addEventListener('hashchange', handleHashChange);
+      return () => window.removeEventListener('hashchange', handleHashChange);
+    }
+  }, [websites, apps]);
+
   // -------------------------------------------------------------
   // Global View Analytics & Visit Logging
   // -------------------------------------------------------------
@@ -352,7 +437,7 @@ export default function App() {
   }, []);
 
   // -------------------------------------------------------------
-  // Scroll reveal trigger listener
+  // Scroll reveal trigger listener, Back to Top visibility, Scrollspy & Progress Bar
   // -------------------------------------------------------------
   useEffect(() => {
     const handleScroll = () => {
@@ -363,11 +448,81 @@ export default function App() {
           elem.classList.add('active');
         }
       });
+
+      // Show back to top button when scrolled past hero section (approx 500px)
+      if (window.scrollY > 500) {
+        setShowBackToTop(true);
+      } else {
+        setShowBackToTop(false);
+      }
+
+      // Calculate scroll progress percentage
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        const progress = (window.scrollY / totalHeight) * 100;
+        setScrollProgress(progress);
+      }
+
+      // Scrollspy logic to automatically highlight the current active section
+      if (currentSectionRef.current !== 'admin') {
+        const sections = ['home', 'websites', 'apps', 'roadmap', 'contact'];
+        const offset = 140; // sticky navbar offset + safe padding
+        let activeSec = 'home';
+        
+        for (const sec of sections) {
+          const el = document.getElementById(sec);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top <= offset) {
+              activeSec = sec;
+            }
+          }
+        }
+        
+        if (currentSectionRef.current !== activeSec) {
+          setCurrentSection(activeSec);
+        }
+      }
     };
     window.addEventListener('scroll', handleScroll);
     handleScroll(); // Trigger initially
     return () => window.removeEventListener('scroll', handleScroll);
   }, [websites, apps]);
+
+  // -------------------------------------------------------------
+  // Keyboard Shortcuts Handler
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Do not trigger shortcuts if user is typing in inputs or textareas
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const tagName = activeEl.tagName.toLowerCase();
+        if (
+          tagName === 'input' || 
+          tagName === 'textarea' || 
+          activeEl.getAttribute('contenteditable') === 'true'
+        ) {
+          return;
+        }
+      }
+
+      const key = e.key.toLowerCase();
+      if (key === 'w') {
+        e.preventDefault();
+        handleNavigate('websites');
+      } else if (key === 'a') {
+        e.preventDefault();
+        handleNavigate('apps');
+      } else if (key === 'c') {
+        e.preventDefault();
+        handleNavigate('contact');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // -------------------------------------------------------------
   // Navigation Handler (Page Scroll or Tab Change)
@@ -744,6 +899,13 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
+      {/* Dynamic Scroll Progress Bar */}
+      <div 
+        className="fixed top-0 left-0 h-[3px] bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500 z-[9999] transition-all duration-75 ease-out"
+        style={{ width: `${scrollProgress}%` }}
+        id="scroll-progress-bar"
+      />
+
       {/* 1. ANNOUNCEMENTS NOTICE BAR */}
       <AnnouncementBanner announcements={announcements} />
 
@@ -760,6 +922,8 @@ export default function App() {
         onNavigate={handleNavigate}
         currentSection={currentSection}
         logo={portfolio.logo}
+        language={language}
+        onLanguageChange={setLanguage}
       />
 
       {/* Search Overlay Indicators */}
@@ -865,31 +1029,66 @@ export default function App() {
                     <span>Hosted Directories</span>
                   </span>
                   <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white mt-1">
-                    Web Apps & Platforms
+                    {t.webShowcase}
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">
-                  Browse functional responsive web tools, SaaS builders, and interactive dashboards hosted live with metrics tracking.
+                  {t.webShowcaseDesc}
                 </p>
               </div>
 
               {/* Websites Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredWebsites.map((web) => (
-                  <div key={web.id} className="reveal-on-scroll">
-                    <ProjectCard
-                      project={web}
-                      type="website"
-                      onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
-                      onIncrementCount={handleIncrementCount}
-                    />
-                  </div>
-                ))}
-              </div>
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="websites-skeleton-grid">
+                  {[...Array(3)].map((_, i) => (
+                    <ProjectCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : (
+                <motion.div 
+                  variants={gridContainerVariants}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: "-100px" }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                  id="websites-motion-grid"
+                >
+                  {filteredWebsites.map((web) => (
+                    <motion.div key={web.id} variants={gridItemVariants}>
+                      <ProjectCard
+                        project={web}
+                        type="website"
+                        onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
+                        onIncrementCount={handleIncrementCount}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
 
               {filteredWebsites.length === 0 && (
-                <div className="text-center py-12 text-slate-400 dark:text-slate-500 font-sans">
-                  No matching web applications found. Clear search query.
+                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-websites">
+                  <div className="relative mb-6">
+                    {/* Glowing Radar Waves */}
+                    <div className="absolute -inset-4 bg-indigo-500/10 rounded-full blur-xl animate-pulse" />
+                    <div className="relative w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm">
+                      <Globe className="w-8 h-8 animate-pulse" />
+                      <Search className="w-4 h-4 absolute -bottom-1 -right-1 text-amber-500 bg-white dark:bg-slate-950 rounded-full p-0.5 border border-amber-300 dark:border-amber-800" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-slate-850 dark:text-slate-100">
+                    {t.noWebsites}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm font-sans leading-relaxed">
+                    We couldn't find any hosted web apps matching <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">"{searchQuery}"</span>. Please try refining your query or resetting filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Clear Search Query
+                  </button>
                 </div>
               )}
 
@@ -909,31 +1108,66 @@ export default function App() {
                     <span>Mobile Software APKs</span>
                   </span>
                   <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white mt-1">
-                    Android Applications
+                    {t.appShowcase}
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">
-                  Download fully compiled Android packages (APKs) directly. Includes change notes, file sizes, version numbers, and scan QR support.
+                  {t.appShowcaseDesc}
                 </p>
               </div>
 
               {/* Apps Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredApps.map((appItem) => (
-                  <div key={appItem.id} className="reveal-on-scroll">
-                    <ProjectCard
-                      project={appItem}
-                      type="app"
-                      onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
-                      onIncrementCount={handleIncrementCount}
-                    />
-                  </div>
-                ))}
-              </div>
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="apps-skeleton-grid">
+                  {[...Array(3)].map((_, i) => (
+                    <ProjectCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : (
+                <motion.div 
+                  variants={gridContainerVariants}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: "-100px" }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                  id="apps-motion-grid"
+                >
+                  {filteredApps.map((appItem) => (
+                    <motion.div key={appItem.id} variants={gridItemVariants}>
+                      <ProjectCard
+                        project={appItem}
+                        type="app"
+                        onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
+                        onIncrementCount={handleIncrementCount}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
 
               {filteredApps.length === 0 && (
-                <div className="text-center py-12 text-slate-400 dark:text-slate-500 font-sans">
-                  No matching mobile software found. Clear search query.
+                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-apps">
+                  <div className="relative mb-6">
+                    {/* Glowing Radar Waves */}
+                    <div className="absolute -inset-4 bg-indigo-500/10 rounded-full blur-xl animate-pulse" />
+                    <div className="relative w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm">
+                      <Smartphone className="w-8 h-8 animate-pulse" />
+                      <Search className="w-4 h-4 absolute -bottom-1 -right-1 text-amber-500 bg-white dark:bg-slate-950 rounded-full p-0.5 border border-amber-300 dark:border-amber-800" />
+                    </div>
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-slate-850 dark:text-slate-100">
+                    No Application Packages Found
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm font-sans leading-relaxed">
+                    No compiled Android packages match <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">"{searchQuery}"</span>. Clear search to show the full mobile software directory.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Clear Search Query
+                  </button>
                 </div>
               )}
 
@@ -951,10 +1185,10 @@ export default function App() {
                   <span>Next Milestones</span>
                 </span>
                 <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white mt-1">
-                  Project Release Roadmap
+                  {t.futureRoadmap}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-sans">
-                  Follow along as I conceptualize, build, and deploy new applications, features, and platform updates.
+                  {t.roadmapDesc}
                 </p>
               </div>
 
@@ -978,21 +1212,21 @@ export default function App() {
                   </span>
                   
                   <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white">
-                    Get in Touch directly
+                    {t.getInTouch}
                   </h2>
                   
                   <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
-                    Have a custom web development or native Android app request? Looking to integrate cloud infrastructure, setup secure database structures, or establish high fidelity UI interactions? Send me an instant inquiry.
+                    {t.getInTouchDesc}
                   </p>
 
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-slate-400">
                       <span className="p-2 bg-slate-100 dark:bg-slate-850 rounded-lg text-indigo-500"><Laptop className="w-4 h-4" /></span>
-                      <span>Primary Email: mdasiullah195@gmail.com</span>
+                      <span>{t.primaryEmail}: mdasiullah195@gmail.com</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-slate-400">
                       <span className="p-2 bg-slate-100 dark:bg-slate-850 rounded-lg text-indigo-500"><Smartphone className="w-4 h-4" /></span>
-                      <span>Target Response: Within 24 Hours</span>
+                      <span>{t.targetResponse}: {t.within24h}</span>
                     </div>
                   </div>
                 </div>
@@ -1026,8 +1260,142 @@ export default function App() {
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
         onEmailLogin={handleEmailLogin}
-        onGoogleLogin={handleGoogleLogin}
       />
+
+      {/* 7. FLOATING BACK TO TOP BUTTON */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => handleNavigate('home')}
+            className="fixed bottom-6 right-6 p-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-xl hover:shadow-amber-500/30 active:scale-95 transition-all z-40 flex items-center justify-center cursor-pointer border border-amber-400/30 group"
+            title="Back to Top"
+            aria-label="Back to Top"
+            id="back-to-top-btn"
+          >
+            <ArrowUp className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* PRINT-ONLY RESUME DYNAMIC DATA TEMPLATE */}
+      <div className="print-only-resume" id="dynamic-resume-container">
+        <div className="border-b-2 border-slate-900 pb-5 mb-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 uppercase mb-1">{portfolio.name || 'Mohamad Osiullah'}</h1>
+            <p className="text-lg font-medium text-slate-700 tracking-wide">{portfolio.title || 'Professional Software Engineer & App Creator'}</p>
+          </div>
+          <div className="text-right text-xs text-slate-600 space-y-1 font-mono">
+            <div>Email: mdasiullah195@gmail.com</div>
+            <div>Portfolio Hub: {window.location.origin}</div>
+            {portfolio.socialLinks?.github && <div>GitHub: {portfolio.socialLinks.github}</div>}
+            {portfolio.socialLinks?.linkedin && <div>LinkedIn: {portfolio.socialLinks.linkedin}</div>}
+          </div>
+        </div>
+
+        {/* Section: Professional Profile */}
+        <div className="mb-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-2">Professional Profile</h2>
+          <p className="text-sm text-slate-800 leading-relaxed">
+            {portfolio.bio || "A highly skilled and adaptive Software Engineer specializing in premium web application architectures and native Android app compiling. Focused on high-fidelity user interactions, security hardening, and resilient database setups."}
+          </p>
+        </div>
+
+        {/* Section: Technical Competence */}
+        {portfolio.skills && portfolio.skills.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-2">Technical Competence</h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-slate-800">
+              {portfolio.skills.map((skill, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-slate-900 rounded-full" />
+                  <span>{skill}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section: Showcase Websites */}
+        {websites && websites.length > 0 && (
+          <div className="mb-6 break-inside-avoid">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-3">Curated Web Engineering Projects</h2>
+            <div className="space-y-4">
+              {websites.map((web) => (
+                <div key={web.id} className="space-y-1 break-inside-avoid">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-900 text-sm">{web.name}</span>
+                    <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">{web.category}</span>
+                  </div>
+                  <div className="text-xs text-slate-600 font-mono">Status: Production Live | Link: {web.url}</div>
+                  <p className="text-xs text-slate-700 leading-relaxed">{web.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section: Software Directory */}
+        {apps && apps.length > 0 && (
+          <div className="mb-6 break-inside-avoid">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-3">Compiled Mobile & Desktop Applications</h2>
+            <div className="space-y-4">
+              {apps.map((appItem) => (
+                <div key={appItem.id} className="space-y-1 break-inside-avoid">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-900 text-sm">{appItem.name}</span>
+                    <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">{appItem.category} | {appItem.version} ({appItem.size})</span>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed">{appItem.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section: Roadmap / Focus Points */}
+        {roadmap && roadmap.length > 0 && (
+          <div className="mb-6 break-inside-avoid">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-3">Product Roadmap & Milestones</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {roadmap.map((item) => (
+                <div key={item.id} className="border-l-2 border-slate-300 pl-3 py-1 space-y-1 text-xs break-inside-avoid">
+                  <div className="font-bold text-slate-900">{item.title}</div>
+                  <div className="text-slate-500 font-mono text-[10px] uppercase">Timeline: {item.date} | Status: {item.status.replace('_', ' ')}</div>
+                  <p className="text-slate-700">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section: Experience Timeline */}
+        {portfolio.experience && portfolio.experience.length > 0 && (
+          <div className="mb-6 break-inside-avoid">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-300 pb-1 mb-3">Professional Experience History</h2>
+            <div className="space-y-3">
+              {portfolio.experience.map((exp: any, index) => (
+                <div key={index} className="text-xs break-inside-avoid">
+                  <div className="flex justify-between items-center font-bold text-slate-900 text-sm">
+                    <span>{exp.role || exp.title || 'Software Engineer'}</span>
+                    <span>{exp.duration || exp.date || ''}</span>
+                  </div>
+                  <div className="text-slate-600 font-mono text-[10px]">{exp.company || exp.organization || ''}</div>
+                  <p className="text-slate-700 mt-1 leading-relaxed">{exp.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="text-center text-[10px] text-slate-400 font-mono border-t border-slate-200 pt-4 mt-8">
+          Self-generated dynamically from Mohamad Osiullah's Curated Portfolio Database on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.
+        </div>
+      </div>
 
     </div>
   );
