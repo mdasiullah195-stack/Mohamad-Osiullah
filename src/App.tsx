@@ -311,6 +311,11 @@ export default function App() {
         snap.forEach(docSnap => {
           annList.push({ id: docSnap.id, ...docSnap.data() } as Announcement);
         });
+        annList.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
         setAnnouncements(annList);
         localStorage.setItem('portfolio_seeded_announcements_v1', 'true');
       } else {
@@ -910,9 +915,6 @@ export default function App() {
         id="scroll-progress-bar"
       />
 
-      {/* 1. ANNOUNCEMENTS NOTICE BAR */}
-      <AnnouncementBanner announcements={announcements} />
-
       {/* 2. MAIN HEADER STICKY NAVIGATION */}
       <Navbar
         darkMode={darkMode}
@@ -975,6 +977,7 @@ export default function App() {
           
           {/* HERO BANNER SECTION */}
           <div ref={homeRef} id="home">
+            <AnnouncementBanner announcements={announcements} />
             <Hero 
               portfolio={portfolio} 
               websites={websites} 
