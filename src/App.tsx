@@ -33,7 +33,9 @@ import {
   RoadmapItem, 
   Announcement, 
   Contact, 
-  AnalyticsStats 
+  AnalyticsStats,
+  Subscriber,
+  Feedback
 } from './types';
 
 // APK Chunking utilities
@@ -60,9 +62,10 @@ import ContactForm from './components/ContactForm';
 import AdminDashboard from './components/AdminDashboard';
 import Footer from './components/Footer';
 import LoginModal from './components/LoginModal';
+import FeedbackSlider from './components/FeedbackSlider';
 
 // Icons
-import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search, Megaphone, Bell, Info, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search, Megaphone, Bell, Info, AlertTriangle, CheckCircle2, Download, Check, AlertCircle } from 'lucide-react';
 
 // Framer Motion staggered animation configurations
 const gridContainerVariants = {
@@ -102,6 +105,8 @@ export default function App() {
   // Section Navigation & Scroll Ref hooks
   const [currentSection, setCurrentSection] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [websiteSort, setWebsiteSort] = useState<'newest' | 'popularity' | 'rating'>('newest');
+  const [appSort, setAppSort] = useState<'newest' | 'popularity' | 'rating'>('newest');
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -151,6 +156,8 @@ export default function App() {
   const [roadmap, setRoadmap] = useState<RoadmapItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsStats>({
     visitors: 0, clicks: 0, downloads: 0, views: 0, dailyLogs: {}
   });
@@ -163,6 +170,17 @@ export default function App() {
   // Modals & Overlays
   const [selectedProject, setSelectedProject] = useState<Website | MobileApp | null>(null);
   const [selectedType, setSelectedType] = useState<'website' | 'app' | null>(null);
+
+  // Toast Notification System
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'info' | 'error' | 'download' }[]>([]);
+
+  const addToast = (message: string, type: 'success' | 'info' | 'error' | 'download' = 'info') => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
 
   // Dark Mode side effects
   useEffect(() => {
@@ -349,6 +367,17 @@ export default function App() {
       // offline fallback
     });
 
+    // 6.5. Listen to Feedbacks and Ratings
+    const unsubFeedbacks = onSnapshot(query(collection(db, 'feedbacks'), orderBy('createdAt', 'desc')), (snap) => {
+      const feedbackList: Feedback[] = [];
+      snap.forEach(docSnap => {
+        feedbackList.push({ id: docSnap.id, ...docSnap.data() } as Feedback);
+      });
+      setFeedbacks(feedbackList);
+    }, (err) => {
+      console.warn('Feedbacks listener offline', err);
+    });
+
     return () => {
       unsubPortfolio();
       unsubWebsites();
@@ -356,6 +385,7 @@ export default function App() {
       unsubRoadmap();
       unsubAnnouncements();
       unsubAnalytics();
+      unsubFeedbacks();
     };
   }, [user]);
 
@@ -380,6 +410,39 @@ export default function App() {
       console.warn('Contacts listener offline');
     });
     return () => unsubContacts();
+  }, [isAdmin]);
+
+  // Listen to Subscribers (Only if logged in as Admin)
+  useEffect(() => {
+    if (!isAdmin) return;
+    const unsubSubscribers = onSnapshot(collection(db, 'subscribers'), (snap) => {
+      const subList: Subscriber[] = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const subDate = data.subscribedAt;
+        let isoDate = new Date().toISOString();
+        if (subDate) {
+          if (typeof subDate.toDate === 'function') {
+            isoDate = subDate.toDate().toISOString();
+          } else if (subDate.seconds) {
+            isoDate = new Date(subDate.seconds * 1000).toISOString();
+          } else {
+            isoDate = new Date(subDate).toISOString();
+          }
+        }
+        subList.push({
+          id: docSnap.id,
+          email: data.email || '',
+          subscribedAt: isoDate
+        });
+      });
+      // Sort newest subscriber first
+      subList.sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime());
+      setSubscribers(subList);
+    }, (err) => {
+      console.warn('Subscribers listener offline');
+    });
+    return () => unsubSubscribers();
   }, [isAdmin]);
 
   // One-time cleanup for obsolete seeded welcome announcement
@@ -882,6 +945,55 @@ export default function App() {
     }
   };
 
+  const handleDeleteSubscriber = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'subscribers', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `subscribers/${id}`);
+    }
+  };
+
+  const handleDeleteFeedback = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'feedbacks', id));
+      addToast('Review deleted successfully', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `feedbacks/${id}`);
+    }
+  };
+
+  const handleSubmitFeedback = async (name: string, rating: number, comment: string) => {
+    if (!selectedProject || !selectedType) return;
+    try {
+      const fbId = `fb-${Date.now()}`;
+      const payload = {
+        id: fbId,
+        name,
+        rating,
+        comment,
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Save feedback
+      await setDoc(doc(db, 'feedbacks', fbId), payload);
+      
+      // Update project counters
+      const coll = selectedType === 'website' ? 'websites' : 'apps';
+      const docRef = doc(db, coll, selectedProject.id);
+      await updateDoc(docRef, {
+        userRatingSum: increment(rating),
+        userRatingCount: increment(1)
+      });
+      
+      addToast('Thank you! Review submitted successfully.', 'success');
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      addToast('Failed to submit review. Please try again.', 'error');
+    }
+  };
+
   // -------------------------------------------------------------
   // Search and Filter Logic
   // -------------------------------------------------------------
@@ -894,6 +1006,18 @@ export default function App() {
     );
   });
 
+  const sortedWebsites = [...filteredWebsites].sort((a, b) => {
+    if (websiteSort === 'popularity') {
+      return (b.views || 0) - (a.views || 0);
+    }
+    if (websiteSort === 'rating') {
+      return (b.rating || 0) - (a.rating || 0);
+    }
+    const dateA = a.releaseDate || '';
+    const dateB = b.releaseDate || '';
+    return dateB.localeCompare(dateA);
+  });
+
   const filteredApps = apps.filter(app => {
     const queryLower = searchQuery.toLowerCase();
     return (
@@ -901,6 +1025,18 @@ export default function App() {
       app.category.toLowerCase().includes(queryLower) ||
       app.description.toLowerCase().includes(queryLower)
     );
+  });
+
+  const sortedApps = [...filteredApps].sort((a, b) => {
+    if (appSort === 'popularity') {
+      return (b.views || 0) - (a.views || 0);
+    }
+    if (appSort === 'rating') {
+      return (b.rating || 0) - (a.rating || 0);
+    }
+    const dateA = a.releaseDate || '';
+    const dateB = b.releaseDate || '';
+    return dateB.localeCompare(dateA);
   });
 
   const featuredProjects = [...websites, ...apps].filter(proj => proj.featured);
@@ -951,6 +1087,8 @@ export default function App() {
             roadmap={roadmap}
             announcements={announcements}
             contacts={contacts}
+            subscribers={subscribers}
+            feedbacks={feedbacks}
             analytics={analytics}
             onUpdatePortfolio={handleUpdatePortfolio}
             onAddWebsite={handleAddWebsite}
@@ -967,6 +1105,8 @@ export default function App() {
             onDeleteAnnouncement={handleDeleteAnnouncement}
             onToggleContactRead={handleToggleContactRead}
             onDeleteContact={handleDeleteContact}
+            onDeleteSubscriber={handleDeleteSubscriber}
+            onDeleteFeedback={handleDeleteFeedback}
           />
         </main>
 
@@ -1102,6 +1242,7 @@ export default function App() {
                           type={isApp ? 'app' : 'website'}
                           onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                           onIncrementCount={handleIncrementCount}
+                          onShowToast={addToast}
                         />
                       </div>
                     );
@@ -1126,9 +1267,23 @@ export default function App() {
                     {t.webShowcase}
                   </h2>
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">
-                  {t.webShowcaseDesc}
-                </p>
+                <div className="flex flex-col items-start md:items-end gap-3 max-w-md">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-sans md:text-right">
+                    {t.webShowcaseDesc}
+                  </p>
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider">Sort by:</span>
+                    <select
+                      value={websiteSort}
+                      onChange={(e) => setWebsiteSort(e.target.value as any)}
+                      className="bg-transparent border-none text-xs text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer font-semibold transition-all"
+                    >
+                      <option value="newest">📅 Newest</option>
+                      <option value="popularity">🔥 Popularity (Views)</option>
+                      <option value="rating">⭐️ Rating</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Websites Grid */}
@@ -1147,20 +1302,21 @@ export default function App() {
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                   id="websites-motion-grid"
                 >
-                  {filteredWebsites.map((web) => (
+                  {sortedWebsites.map((web) => (
                     <motion.div key={web.id} variants={gridItemVariants}>
                       <ProjectCard
                         project={web}
                         type="website"
                         onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                         onIncrementCount={handleIncrementCount}
+                        onShowToast={addToast}
                       />
                     </motion.div>
                   ))}
                 </motion.div>
               )}
 
-              {filteredWebsites.length === 0 && (
+              {sortedWebsites.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-websites">
                   <div className="relative mb-6">
                     {/* Glowing Radar Waves */}
@@ -1205,9 +1361,23 @@ export default function App() {
                     {t.appShowcase}
                   </h2>
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">
-                  {t.appShowcaseDesc}
-                </p>
+                <div className="flex flex-col items-start md:items-end gap-3 max-w-md">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-sans md:text-right">
+                    {t.appShowcaseDesc}
+                  </p>
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider">Sort by:</span>
+                    <select
+                      value={appSort}
+                      onChange={(e) => setAppSort(e.target.value as any)}
+                      className="bg-transparent border-none text-xs text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer font-semibold transition-all"
+                    >
+                      <option value="newest">📅 Newest</option>
+                      <option value="popularity">🔥 Popularity (Views)</option>
+                      <option value="rating">⭐️ Rating</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Apps Grid */}
@@ -1226,20 +1396,21 @@ export default function App() {
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                   id="apps-motion-grid"
                 >
-                  {filteredApps.map((appItem) => (
+                  {sortedApps.map((appItem) => (
                     <motion.div key={appItem.id} variants={gridItemVariants}>
                       <ProjectCard
                         project={appItem}
                         type="app"
                         onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                         onIncrementCount={handleIncrementCount}
+                        onShowToast={addToast}
                       />
                     </motion.div>
                   ))}
                 </motion.div>
               )}
 
-              {filteredApps.length === 0 && (
+              {sortedApps.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-apps">
                   <div className="relative mb-6">
                     {/* Glowing Radar Waves */}
@@ -1335,6 +1506,9 @@ export default function App() {
             </div>
           </section>
 
+          {/* Feedback & Testimonials Slider Section */}
+          <FeedbackSlider feedbacks={feedbacks} />
+
         </main>
       )}
 
@@ -1347,6 +1521,9 @@ export default function App() {
         type={selectedType}
         onClose={() => { setSelectedProject(null); setSelectedType(null); }}
         onIncrementCount={handleIncrementCount}
+        onShowToast={addToast}
+        feedbacks={feedbacks}
+        onSubmitFeedback={handleSubmitFeedback}
       />
 
       {/* 6. ADMIN SECURITY LOGIN GATEWAY */}
@@ -1375,6 +1552,57 @@ export default function App() {
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* 8. GLOBAL ANIMATED TOAST NOTIFICATIONS */}
+      <div className="fixed bottom-6 right-6 z-[99999] flex flex-col gap-3 pointer-events-none max-w-sm w-full px-4 font-sans" id="global-toasts-container">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              layout
+              className="pointer-events-auto flex items-start gap-3 px-4 py-3.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-150 dark:border-slate-800/80 text-left relative overflow-hidden"
+              id={`toast-item-${toast.id}`}
+            >
+              <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100/10 dark:border-indigo-900/30 shrink-0 mt-0.5">
+                {toast.type === 'download' ? (
+                  <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-bounce" />
+                ) : toast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                ) : toast.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                ) : (
+                  <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                )}
+              </div>
+              <div className="flex-1 space-y-0.5 pr-4">
+                <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 font-mono uppercase tracking-wider">
+                  {toast.type === 'download' ? 'Download Initiated' : toast.type === 'success' ? 'Action Completed' : toast.type === 'error' ? 'Notification Alert' : 'System Notice'}
+                </div>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-relaxed">
+                  {toast.message}
+                </p>
+                {toast.type === 'download' && (
+                  <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold mt-1 shadow-sm">
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Logged to Analytics</span>
+                  </div>
+                )}
+              </div>
+              {/* Animated lifetime timeline indicator bar */}
+              <motion.div 
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: 4, ease: "linear" }}
+                className="absolute bottom-0 left-0 h-[2px] bg-indigo-500/50 dark:bg-indigo-400/50"
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* PRINT-ONLY RESUME DYNAMIC DATA TEMPLATE */}
       <div className="print-only-resume" id="dynamic-resume-container">

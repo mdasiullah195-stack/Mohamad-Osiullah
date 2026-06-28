@@ -1,4 +1,4 @@
-import { collection, doc, writeBatch, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Chunk size in characters (approx 900 KB each, very safe for Firestore 1MB document limit)
@@ -51,6 +51,13 @@ export async function saveApkChunks(
     await sleep(600);
   }
 
+  // Save info doc with metadata for fast sequential/parallel reads
+  try {
+    await setDoc(doc(db, 'apps', appId, 'apkChunks', 'info'), { numChunks });
+  } catch (err) {
+    console.error("Failed to write chunks info document:", err);
+  }
+
   // Return special indicator URL so the downloader knows to fetch from chunks subcollection
   return `chunks://${appId}`;
 }
@@ -79,6 +86,45 @@ export async function deleteApkChunks(appId: string) {
 }
 
 export async function fetchAndReassembleApk(appId: string, onProgress?: (percent: number) => void): Promise<string> {
+  // First, try to fetch the 'info' document
+  let numChunks = 0;
+  try {
+    const infoSnap = await getDoc(doc(db, 'apps', appId, 'apkChunks', 'info'));
+    if (infoSnap.exists()) {
+      numChunks = infoSnap.data().numChunks || 0;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch APK chunks info document, falling back to query:", err);
+  }
+
+  if (numChunks > 0) {
+    const chunkPromises: Promise<string>[] = [];
+    let completedCount = 0;
+
+    // We can fetch chunks concurrently!
+    const fetchChunk = async (index: number): Promise<string> => {
+      const chunkDoc = await getDoc(doc(db, 'apps', appId, 'apkChunks', `chunk-${index}`));
+      if (!chunkDoc.exists()) {
+        throw new Error(`Chunk ${index} not found.`);
+      }
+      completedCount++;
+      if (onProgress) {
+        onProgress(Math.round((completedCount / numChunks) * 100));
+      }
+      return chunkDoc.data().data || '';
+    };
+
+    // Create array of promises
+    for (let i = 0; i < numChunks; i++) {
+      chunkPromises.push(fetchChunk(i));
+    }
+
+    // Wait for all chunks to resolve in parallel (extremely fast!)
+    const chunks = await Promise.all(chunkPromises);
+    return chunks.join('');
+  }
+
+  // Fallback if no info document exists yet (self-healing)
   const colRef = collection(db, 'apps', appId, 'apkChunks');
   const snapshot = await getDocs(colRef);
   
@@ -86,22 +132,32 @@ export async function fetchAndReassembleApk(appId: string, onProgress?: (percent
     throw new Error("No APK chunks found in database. The file may be missing or corrupt.");
   }
 
+  // Filter out the info document itself if it exists
+  const chunkDocs = snapshot.docs.filter(d => d.id !== 'info');
+
   // Sort docs by their chunk index
-  const docs = [...snapshot.docs].sort((a, b) => {
+  const sortedDocs = [...chunkDocs].sort((a, b) => {
     const aData = a.data();
     const bData = b.data();
     return (aData.index ?? 0) - (bData.index ?? 0);
   });
 
   let fullBase64 = '';
-  const total = docs.length;
+  const total = sortedDocs.length;
 
   for (let i = 0; i < total; i++) {
-    const docData = docs[i].data();
+    const docData = sortedDocs[i].data();
     fullBase64 += docData.data || '';
     if (onProgress) {
       onProgress(Math.round(((i + 1) / total) * 100));
     }
+  }
+
+  // Self-heal: Write back the info document for future lightning-fast loads
+  try {
+    await setDoc(doc(db, 'apps', appId, 'apkChunks', 'info'), { numChunks: total });
+  } catch (err) {
+    console.warn("Failed to write back info document for self-healing:", err);
   }
 
   return fullBase64;

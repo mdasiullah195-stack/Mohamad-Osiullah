@@ -122,6 +122,20 @@
         "subscribedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["email"]
+    },
+    "Feedback": {
+      "title": "Feedback and Rating",
+      "description": "User reviews and ratings for projects or the portfolio",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Reviewer's name" },
+        "rating": { "type": "number", "description": "Rating score out of 5" },
+        "comment": { "type": "string", "description": "Detailed review comment" },
+        "projectId": { "type": "string", "description": "Optional associated project ID" },
+        "projectName": { "type": "string", "description": "Optional associated project name" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "rating", "comment"]
     }
   },
   "firestore": {
@@ -156,6 +170,10 @@
     "/subscribers/{subscriberId}": {
       "schema": "Subscriber",
       "description": "List of newsletter subscribers"
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "User reviews and ratings submitted by visitors"
     }
   }
 }

@@ -48,6 +48,8 @@ export interface Website {
   releaseDate?: string;
   updateDate?: string;
   changelog?: string;
+  userRatingSum?: number;
+  userRatingCount?: number;
 }
 
 export interface App {
@@ -68,6 +70,8 @@ export interface App {
   updateDate: string;
   screenshots: string[]; // gallery screenshot URLs
   banner?: string;
+  userRatingSum?: number;
+  userRatingCount?: number;
 }
 
 export interface Contact {
@@ -110,4 +114,20 @@ export interface AnalyticsStats {
       views: number;
     };
   };
+}
+
+export interface Subscriber {
+  id: string;
+  email: string;
+  subscribedAt: string;
+}
+
+export interface Feedback {
+  id: string;
+  name: string;
+  rating: number; // 1 to 5
+  comment: string;
+  projectId?: string; // empty means global portfolio feedback
+  projectName?: string; // project name for ease of reference
+  createdAt: string;
 }

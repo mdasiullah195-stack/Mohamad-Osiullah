@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { Language, translations } from '../utils/translations';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface NavbarProps {
   darkMode: boolean;
@@ -91,14 +92,17 @@ export default function Navbar({
                     onNavigate(item.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
                     currentSection === item.id
                       ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
-                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-slate-800/40'
+                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                   id={`nav-link-${item.id}`}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {currentSection !== item.id && (
+                    <span className="absolute bottom-1 left-4 right-4 h-[2px] bg-indigo-600 dark:bg-indigo-400 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100" />
+                  )}
                 </button>
               ))}
             </div>
@@ -155,9 +159,9 @@ export default function Navbar({
               {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
             </button>
 
-            {/* Admin Controls */}
+            {/* Admin Controls (Desktop and large screens only) */}
             {isAdmin ? (
-              <div className="flex items-center gap-1.5">
+              <div className="hidden lg:flex items-center gap-1.5">
                 <button
                   onClick={() => onNavigate('admin')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
@@ -168,7 +172,7 @@ export default function Navbar({
                   id="admin-dashboard-btn"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Admin Panel</span>
+                  <span>Admin Panel</span>
                 </button>
                 <button
                   onClick={onLogout}
@@ -180,7 +184,7 @@ export default function Navbar({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="hidden lg:flex items-center gap-1">
                 {/* Admin Sign-In Button */}
                 <button
                   onClick={onLogin}
@@ -207,57 +211,116 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden glass border-t border-gray-200 dark:border-slate-800 py-3 px-4 flex flex-col gap-2 transition-all">
-          
-          {/* Mobile Search Input */}
-          <div className="relative mb-2">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder={t.searchProjects}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-150 dark:bg-slate-800 border border-transparent focus:border-amber-500 rounded-lg text-gray-900 dark:text-white"
-            />
-          </div>
+      {/* Mobile Menu Dropdown with smooth animated entry */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="lg:hidden glass border-t border-gray-200 dark:border-slate-800 py-4 px-4 flex flex-col gap-2 overflow-hidden shadow-xl"
+            id="mobile-dropdown-menu"
+          >
+            
+            {/* Mobile Search Input */}
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder={t.searchProjects}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-150 dark:bg-slate-800 border border-transparent focus:border-amber-500 rounded-lg text-gray-900 dark:text-white"
+              />
+            </div>
 
-          {/* Navigation Links */}
-          {navItems.map((item) => (
+            {/* Navigation Links with animated underlines */}
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  onNavigate(item.id);
+                  setMobileMenuOpen(false);
+                }}
+                className={`relative w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
+                  currentSection === item.id
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
+                    : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <span>{item.label}</span>
+                {currentSection !== item.id && (
+                  <span className="absolute bottom-1.5 left-3 right-3 h-[2px] bg-indigo-600 dark:bg-indigo-400 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100" />
+                )}
+              </button>
+            ))}
+
+            {/* Language Switcher Button for Mobile */}
             <button
-              key={item.id}
               onClick={() => {
-                onNavigate(item.id);
+                onLanguageChange(language === 'EN' ? 'NE' : 'EN');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                currentSection === item.id
-                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
-                  : 'text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800'
-              }`}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-3"
+              id="mobile-language-toggle-btn"
             >
-              {item.label}
+              <span className="font-mono text-xs border border-gray-300 dark:border-slate-700 px-1.5 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
+                {language}
+              </span>
+              <span>Toggle Language (EN / NE)</span>
             </button>
-          ))}
 
-          {/* Language Switcher Button for Mobile */}
-          <button
-            onClick={() => {
-              onLanguageChange(language === 'EN' ? 'NE' : 'EN');
-              setMobileMenuOpen(false);
-            }}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-2"
-            id="mobile-language-toggle-btn"
-          >
-            <span className="font-mono text-xs border border-gray-300 dark:border-slate-700 px-1.5 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
-              {language}
-            </span>
-            <span>Toggle Language (EN / NE)</span>
-          </button>
+            {/* Admin Controls inside Dropdown for Mobile/Tablet views */}
+            <div className="mt-2 pt-3 border-t border-gray-100 dark:border-slate-800/50 flex flex-col gap-2">
+              <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest px-3 mb-1">
+                Administrator Actions
+              </span>
+              {isAdmin ? (
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      onNavigate('admin');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                      currentSection === 'admin'
+                        ? 'bg-indigo-600 border-indigo-700 text-white shadow-md'
+                        : 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/30'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Go to Admin Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all border border-dashed border-rose-200/30 hover:border-rose-400"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout Session</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    onLogin();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-slate-900 transition-all shadow-md"
+                  id="mobile-admin-login-btn"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Admin Sign In</span>
+                </button>
+              )}
+            </div>
 
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }

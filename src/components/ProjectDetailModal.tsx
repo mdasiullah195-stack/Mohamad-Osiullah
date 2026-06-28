@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Website, App } from '../types';
-import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode, Copy, Check } from 'lucide-react';
+import { Website, App, Feedback } from '../types';
+import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode, Copy, Check, Clock, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAndReassembleApk, downloadBase64File } from '../utils/apkDownloader';
 
@@ -9,13 +9,45 @@ interface ProjectDetailModalProps {
   type: 'website' | 'app' | null;
   onClose: () => void;
   onIncrementCount: (projectId: string, type: 'website' | 'app', field: 'views' | 'clicks' | 'downloads') => void;
+  onShowToast?: (message: string, type: 'success' | 'info' | 'error' | 'download') => void;
+  feedbacks: Feedback[];
+  onSubmitFeedback: (name: string, rating: number, comment: string) => Promise<void>;
 }
 
-export default function ProjectDetailModal({ project, type, onClose, onIncrementCount }: ProjectDetailModalProps) {
+export default function ProjectDetailModal({ 
+  project, 
+  type, 
+  onClose, 
+  onIncrementCount, 
+  onShowToast,
+  feedbacks = [],
+  onSubmitFeedback
+}: ProjectDetailModalProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [showQr, setShowQr] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [fbName, setFbName] = useState('');
+  const [fbRating, setFbRating] = useState(5);
+  const [fbHoverRating, setFbHoverRating] = useState<number | null>(null);
+  const [fbComment, setFbComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fbName.trim() || !fbComment.trim()) return;
+    setSubmittingFeedback(true);
+    try {
+      await onSubmitFeedback(fbName.trim(), fbRating, fbComment.trim());
+      setFbName('');
+      setFbRating(5);
+      setFbComment('');
+    } catch (error) {
+      console.error("Error submitting review:", error);
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   const handleCopyLink = () => {
     const directUrl = `${window.location.origin}${window.location.pathname}#${type}-${project.id}`;
@@ -33,12 +65,17 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
   const webProj = project as Website;
   const appProj = project as App;
 
+  // Dynamically calculate Estimated Reading Time based on description text
+  const wordCount = project.description ? project.description.trim().split(/\s+/).filter(Boolean).length : 0;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 180)); // 180 words per minute is a standard comfortable speed
+
   // Handle visit / download actions
   const handleAction = async (field: 'clicks' | 'downloads') => {
     if (isWeb) {
       onIncrementCount(project.id, type, field);
       window.open(webProj.url, '_blank', 'noopener,noreferrer');
     } else {
+      onShowToast?.(`Starting download of ${appProj.name} v${appProj.version}...`, 'download');
       if (appProj.apkUrl && appProj.apkUrl.startsWith('chunks://')) {
         if (downloadProgress !== null) return; // already downloading
         try {
@@ -187,9 +224,15 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
                 
                 {/* Description */}
                 <div>
-                  <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mb-2">
-                    About Project
-                  </h3>
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">
+                      About Project
+                    </h3>
+                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-[10px] font-mono font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-100/20 dark:border-indigo-900/30 shadow-sm" id="reading-time-badge">
+                      <Clock className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
+                      <span>{readingTime} min read</span>
+                    </div>
+                  </div>
                   <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-sans text-sm sm:text-base">
                     {project.description}
                   </p>
@@ -265,6 +308,138 @@ export default function ProjectDetailModal({ project, type, onClose, onIncrement
                     </p>
                   </div>
                 )}
+
+                {/* ------------------------------------------------------------- */}
+                {/* User Reviews & Ratings Section */}
+                {/* ------------------------------------------------------------- */}
+                <div className="p-5 rounded-2xl bg-gray-55/30 dark:bg-slate-850/20 border border-gray-150 dark:border-slate-800/50 space-y-6 mt-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/20 pb-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">
+                        User Reviews & Ratings
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        Share your thoughts or rate this project
+                      </p>
+                    </div>
+                    
+                    {/* Overall User Score Badge */}
+                    {(() => {
+                      const projectFeedbacks = feedbacks.filter(fb => fb.projectId === project.id);
+                      const totalReviews = projectFeedbacks.length;
+                      const avgRating = totalReviews > 0 
+                        ? (projectFeedbacks.reduce((sum, f) => sum + f.rating, 0) / totalReviews).toFixed(1)
+                        : null;
+                        
+                      return avgRating ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs font-mono self-start sm:self-auto">
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                          <span>{avgRating} ★ ({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono italic self-start sm:self-auto">No reviews yet</span>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Submit Feedback Form */}
+                  <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 font-mono mb-1">Your Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Your Name"
+                          value={fbName}
+                          onChange={(e) => setFbName(e.target.value)}
+                          className="block w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg font-sans placeholder-slate-400 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 font-mono mb-1">Your Rating *</label>
+                        <div className="flex items-center gap-1.5 py-1.5">
+                          {Array.from({ length: 5 }).map((_, i) => {
+                            const starValue = i + 1;
+                            const isFilled = fbHoverRating !== null ? starValue <= fbHoverRating : starValue <= fbRating;
+                            
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setFbRating(starValue)}
+                                onMouseEnter={() => setFbHoverRating(starValue)}
+                                onMouseLeave={() => setFbHoverRating(null)}
+                                className="text-amber-500 transition-transform duration-100 hover:scale-125 focus:outline-none cursor-pointer"
+                              >
+                                <Star className={`w-5 h-5 ${isFilled ? 'fill-current' : 'opacity-30'}`} />
+                              </button>
+                            );
+                          })}
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-500 font-mono ml-2">
+                            ({fbRating}/5)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 font-mono mb-1">Your Review / Comment *</label>
+                      <textarea
+                        rows={2}
+                        required
+                        placeholder="Write a brief comment about this project..."
+                        value={fbComment}
+                        onChange={(e) => setFbComment(e.target.value)}
+                        className="block w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg font-sans placeholder-slate-400 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingFeedback}
+                      className="px-4 py-2 bg-slate-950 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold text-[11px] font-mono uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{submittingFeedback ? 'Submitting...' : 'Submit Review'}</span>
+                    </button>
+                  </form>
+
+                  {/* Reviews List */}
+                  {(() => {
+                    const projectFeedbacks = feedbacks.filter(fb => fb.projectId === project.id);
+                    if (projectFeedbacks.length === 0) return null;
+                    
+                    return (
+                      <div className="space-y-3 pt-3 border-t border-gray-200/10">
+                        <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">
+                          Recent Comments ({projectFeedbacks.length})
+                        </h4>
+                        <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                          {projectFeedbacks.map(fb => (
+                            <div key={fb.id} className="p-3.5 rounded-xl bg-white/40 dark:bg-slate-900/40 border border-gray-200/30 dark:border-slate-850/30 space-y-1.5 text-left">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{fb.name}</span>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star key={i} className={`w-3 h-3 text-amber-500 ${i < fb.rating ? 'fill-current' : 'opacity-20'}`} />
+                                  ))}
+                                  <span className="text-[9px] text-slate-400 font-mono ml-1">
+                                    {fb.createdAt ? new Date(fb.createdAt).toLocaleDateString() : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 leading-normal font-sans italic">
+                                "{fb.comment}"
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
 
               </div>
 

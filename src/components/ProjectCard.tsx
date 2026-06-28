@@ -8,9 +8,10 @@ interface ProjectCardProps {
   type: 'website' | 'app';
   onViewDetails: (project: Website | App, type: 'website' | 'app') => void;
   onIncrementCount: (projectId: string, type: 'website' | 'app', field: 'views' | 'clicks' | 'downloads') => void;
+  onShowToast?: (message: string, type: 'success' | 'info' | 'error' | 'download') => void;
 }
 
-export default function ProjectCard({ project, type, onViewDetails, onIncrementCount }: ProjectCardProps) {
+export default function ProjectCard({ project, type, onViewDetails, onIncrementCount, onShowToast }: ProjectCardProps) {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   
   const handleShare = (e: React.MouseEvent) => {
@@ -39,6 +40,7 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
       window.open(web.url, '_blank', 'noopener,noreferrer');
     } else {
       const app = project as App;
+      onShowToast?.(`Starting download of ${app.name} v${app.version}...`, 'download');
       if (app.apkUrl && app.apkUrl.startsWith('chunks://')) {
         if (downloadProgress !== null) return; // already downloading
         try {
