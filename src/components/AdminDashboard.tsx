@@ -32,7 +32,9 @@ import {
   TrendingUp, 
   Clock, 
   CheckCircle2, 
-  UserCheck 
+  UserCheck,
+  Star,
+  MessageSquare
 } from 'lucide-react';
 import { 
   Portfolio, 
@@ -44,7 +46,8 @@ import {
   AnalyticsStats, 
   Experience,
   Subscriber,
-  Feedback
+  Feedback,
+  Comment
 } from '../types';
 import ImageCropperModal from './ImageCropperModal';
 
@@ -58,6 +61,7 @@ interface AdminDashboardProps {
   subscribers: Subscriber[];
   feedbacks: Feedback[];
   analytics: AnalyticsStats;
+  comments?: Comment[];
   onUpdatePortfolio: (portfolio: Portfolio) => void;
   onAddWebsite: (website: Omit<Website, 'id' | 'views' | 'clicks' | 'createdAt'>) => void;
   onEditWebsite: (website: Website) => void;
@@ -75,6 +79,7 @@ interface AdminDashboardProps {
   onDeleteContact: (id: string) => void;
   onDeleteSubscriber: (id: string) => void;
   onDeleteFeedback: (id: string) => void;
+  onDeleteComment?: (id: string) => void;
 }
 
 export default function AdminDashboard({
@@ -87,6 +92,7 @@ export default function AdminDashboard({
   subscribers = [],
   feedbacks = [],
   analytics,
+  comments = [],
   onUpdatePortfolio,
   onAddWebsite,
   onEditWebsite,
@@ -103,10 +109,11 @@ export default function AdminDashboard({
   onToggleContactRead,
   onDeleteContact,
   onDeleteSubscriber,
-  onDeleteFeedback
+  onDeleteFeedback,
+  onDeleteComment
 }: AdminDashboardProps) {
   
-  const [activeTab, setActiveTab] = useState<'analytics' | 'portfolio' | 'websites' | 'apps' | 'roadmap' | 'announcements' | 'messages' | 'subscribers' | 'feedbacks'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'portfolio' | 'websites' | 'apps' | 'roadmap' | 'announcements' | 'messages' | 'subscribers' | 'feedbacks' | 'comments'>('analytics');
   const [sidebarMobileExpanded, setSidebarMobileExpanded] = useState(false);
   const [webSortBy, setWebSortBy] = useState<'recent' | 'rating' | 'userRating'>('recent');
   const [appSortBy, setAppSortBy] = useState<'recent' | 'rating' | 'userRating'>('recent');
@@ -912,7 +919,8 @@ export default function AdminDashboard({
               { id: 'announcements', label: 'Announcement Board', icon: <Megaphone className="w-4 h-4" /> },
               { id: 'messages', label: `Inquiries (${contacts.filter(c=>!c.read).length})`, icon: <Mail className="w-4 h-4" /> },
               { id: 'subscribers', label: `Subscribers (${subscribers.length})`, icon: <UserCheck className="w-4 h-4" /> },
-              { id: 'feedbacks', label: `Reviews & Ratings (${feedbacks.length})`, icon: <Star className="w-4 h-4" /> }
+              { id: 'feedbacks', label: `Reviews & Ratings (${feedbacks.length})`, icon: <Star className="w-4 h-4" /> },
+              { id: 'comments', label: `Project Comments (${comments.length})`, icon: <MessageSquare className="w-4 h-4" /> }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -2564,6 +2572,70 @@ export default function AdminDashboard({
                     <Star className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3 animate-pulse" />
                     <p className="text-sm font-semibold">No reviews yet</p>
                     <p className="text-xs mt-0.5">When visitors leave ratings and feedback on your projects, they will show up here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 10. PROJECT COMMENTS LIST */}
+          {activeTab === 'comments' && (
+            <div className="space-y-6 text-left animate-fade-in" id="admin-panel-comments">
+              <h3 className="font-display font-extrabold text-xl text-slate-900 dark:text-white border-b border-gray-200/20 pb-3 flex items-center justify-between">
+                <span>Discussion Thread Comments</span>
+                <span className="text-xs text-slate-400 font-mono font-semibold">{comments.length} comments total</span>
+              </h3>
+
+              <div className="space-y-3">
+                {comments.map((c) => (
+                  <div 
+                    key={c.id} 
+                    className="p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 text-left transition-all flex items-start justify-between gap-4"
+                    id={`comment-item-${c.id}`}
+                  >
+                    <div className="flex gap-3 flex-1 items-start">
+                      <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200/50 dark:border-slate-800 shrink-0 bg-slate-150">
+                        <img 
+                          src={c.userPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${c.userName}`} 
+                          alt={c.userName} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-none">{c.userName}</span>
+                          <span className="text-[10px] text-slate-400 font-mono leading-none">
+                            (UID: {c.userId?.substring(0, 8)}...)
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-55 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100/25">
+                            {c.projectName} ({c.projectType})
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-sans font-medium">
+                          {c.text}
+                        </p>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          Posted: {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => onDeleteComment?.(c.id)}
+                      className="p-2 hover:bg-rose-55 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 rounded-lg transition-all shrink-0 border border-transparent hover:border-rose-100 dark:hover:border-rose-900/30 cursor-pointer"
+                      title="Delete Comment"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {comments.length === 0 && (
+                  <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+                    <MessageSquare className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3 animate-pulse" />
+                    <p className="text-sm font-semibold">No comments posted yet</p>
+                    <p className="text-xs mt-0.5">When users post discussion comments on your projects, they will show up here for you to moderate.</p>
                   </div>
                 )}
               </div>

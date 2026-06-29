@@ -32,6 +32,7 @@
         "rating": { "type": "number", "description": "Admin rating out of 5" },
         "views": { "type": "number", "description": "Total view count" },
         "clicks": { "type": "number", "description": "Total visit/click count" },
+        "likes": { "type": "number", "description": "Total appreciation likes count" },
         "createdAt": { "type": "string", "format": "date-time" },
         "screenshots": { "type": "array", "description": "Optional extra screenshot URLs" }
       },
@@ -54,6 +55,7 @@
         "rating": { "type": "number", "description": "Admin rating" },
         "downloads": { "type": "number", "description": "Total download count" },
         "views": { "type": "number", "description": "Total view count" },
+        "likes": { "type": "number", "description": "Total appreciation likes count" },
         "releaseDate": { "type": "string", "format": "date" },
         "updateDate": { "type": "string", "format": "date" },
         "screenshots": { "type": "array", "description": "List of screenshot URLs" },
@@ -136,6 +138,33 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "rating", "comment"]
+    },
+    "Comment": {
+      "title": "Project Comment",
+      "description": "User comments on specific showcase projects",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "Associated project ID" },
+        "projectName": { "type": "string", "description": "Name of the associated project" },
+        "projectType": { "type": "string", "enum": ["website", "app"] },
+        "userId": { "type": "string", "description": "UID of the commenter" },
+        "userName": { "type": "string", "description": "Name of the commenter" },
+        "userPhoto": { "type": "string", "description": "Avatar image URL of the commenter" },
+        "text": { "type": "string", "description": "Comment content text" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "projectName", "projectType", "userId", "userName", "text", "createdAt"]
+    },
+    "Like": {
+      "title": "Project Appreciation Like",
+      "description": "Appreciation likes for a specific website or app",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "ID of liked project" },
+        "userId": { "type": "string", "description": "UID of user who liked" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "userId", "createdAt"]
     }
   },
   "firestore": {
@@ -174,6 +203,14 @@
     "/feedbacks/{feedbackId}": {
       "schema": "Feedback",
       "description": "User reviews and ratings submitted by visitors"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "User-posted comments on projects"
+    },
+    "/likes/{likeId}": {
+      "schema": "Like",
+      "description": "Likes and appreciation records for projects"
     }
   }
 }

@@ -42,6 +42,7 @@ export interface Website {
   rating: number; // admin rating 1-5
   views: number;
   clicks: number;
+  likes?: number;
   createdAt: string;
   screenshots?: string[]; // extra screenshots
   version?: string;
@@ -66,6 +67,7 @@ export interface App {
   rating: number; // admin rating 1-5
   downloads: number;
   views: number;
+  likes?: number;
   releaseDate: string;
   updateDate: string;
   screenshots: string[]; // gallery screenshot URLs
@@ -129,5 +131,24 @@ export interface Feedback {
   comment: string;
   projectId?: string; // empty means global portfolio feedback
   projectName?: string; // project name for ease of reference
+  createdAt: string;
+}
+
+export interface Comment {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectType: 'website' | 'app';
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface Like {
+  id: string;
+  projectId: string;
+  userId: string;
   createdAt: string;
 }

@@ -4,6 +4,7 @@ import { Portfolio } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Language, translations } from '../utils/translations';
+import SocialMediaConnect from './SocialMediaConnect';
 
 interface FooterProps {
   portfolio: Portfolio;
@@ -132,72 +133,10 @@ export default function Footer({ portfolio, onNavigate, logo }: FooterProps) {
             </div>
           </div>
 
-          {/* Social Row */}
-          <div className="flex items-center gap-4 bg-slate-900/30 px-5 py-2.5 rounded-full border border-slate-900">
-            {portfolio.socialLinks.github && (
-              <a 
-                href={portfolio.socialLinks.github} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-400 hover:text-white transition-colors"
-                aria-label="GitHub"
-              >
-                <Github className="w-4 h-4" />
-              </a>
-            )}
-            {portfolio.socialLinks.linkedin && (
-              <a 
-                href={portfolio.socialLinks.linkedin} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="w-4 h-4" />
-              </a>
-            )}
-            {portfolio.socialLinks.twitter && (
-              <a 
-                href={portfolio.socialLinks.twitter} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-400 hover:text-sky-400 transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="w-4 h-4" />
-              </a>
-            )}
-            {portfolio.socialLinks.facebook && (
-              <a 
-                href={portfolio.socialLinks.facebook} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-400 hover:text-blue-500 transition-colors"
-                aria-label="Facebook"
-              >
-                <Facebook className="w-4 h-4" />
-              </a>
-            )}
-            {portfolio.socialLinks.tiktok && (
-              <a 
-                href={portfolio.socialLinks.tiktok} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-slate-400 hover:text-rose-400 transition-colors"
-                aria-label="TikTok"
-              >
-                <Music className="w-4 h-4" />
-              </a>
-            )}
-            {portfolio.socialLinks.email && (
-              <a 
-                href={`mailto:${portfolio.socialLinks.email}`}
-                className="text-slate-400 hover:text-indigo-400 transition-colors"
-                aria-label="Email"
-              >
-                <Mail className="w-4 h-4" />
-              </a>
-            )}
+          {/* Social Row with Dynamic Expanding Share Menu */}
+          <div className="flex items-center gap-4 py-2" id="footer-social-expansion-container">
+            <span className="text-xs text-slate-500 font-mono font-semibold mr-1">Share & Connect:</span>
+            <SocialMediaConnect />
           </div>
 
           {/* Top Button and Copyright */}

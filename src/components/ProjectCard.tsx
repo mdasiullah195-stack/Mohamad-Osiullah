@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Website, App } from '../types';
-import { Globe, Download, Eye, ExternalLink, Share2, Star, Smartphone, Calendar, FileText } from 'lucide-react';
+import { Globe, Download, Eye, ExternalLink, Share2, Star, Smartphone, Calendar, FileText, Heart } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { fetchAndReassembleApk, downloadBase64File } from '../utils/apkDownloader';
 
 interface ProjectCardProps {
@@ -9,9 +10,19 @@ interface ProjectCardProps {
   onViewDetails: (project: Website | App, type: 'website' | 'app') => void;
   onIncrementCount: (projectId: string, type: 'website' | 'app', field: 'views' | 'clicks' | 'downloads') => void;
   onShowToast?: (message: string, type: 'success' | 'info' | 'error' | 'download') => void;
+  onToggleLike?: (projectId: string, type: 'website' | 'app') => void;
+  userLikes?: string[];
 }
 
-export default function ProjectCard({ project, type, onViewDetails, onIncrementCount, onShowToast }: ProjectCardProps) {
+export default function ProjectCard({ 
+  project, 
+  type, 
+  onViewDetails, 
+  onIncrementCount, 
+  onShowToast,
+  onToggleLike,
+  userLikes = []
+}: ProjectCardProps) {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   
   const handleShare = (e: React.MouseEvent) => {
@@ -172,16 +183,32 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
         {/* Analytics Tracker row & Action buttons */}
         <div>
           {/* Counters bar */}
-          <div className="flex items-center gap-4 text-xs font-mono text-slate-400 dark:text-slate-500 mb-4 border-t border-gray-200/20 dark:border-slate-800/30 pt-3.5">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400 dark:text-slate-500 mb-4 border-t border-gray-200/20 dark:border-slate-800/30 pt-3.5">
+            <div className="flex items-center gap-1 shrink-0">
               <Eye className="w-3.5 h-3.5" />
               <span>{project.views} views</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {isWeb ? <Globe className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
               <span>
-                {isWeb ? `${webProj.clicks} clicks` : `${appProj.downloads} downloads`}
+                {isWeb ? `${webProj.clicks} clicks` : `${appProj.downloads} dls`}
               </span>
+            </div>
+            {/* Animated Likes counter */}
+            <div className="flex items-center gap-1 text-rose-500 font-bold shrink-0">
+              <Heart className={`w-3.5 h-3.5 ${userLikes.includes(project.id) ? 'fill-rose-500' : ''}`} />
+              <AnimatePresence mode="popLayout">
+                <motion.span
+                  key={project.likes || 0}
+                  initial={{ y: -8, opacity: 0, scale: 0.8 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: 8, opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  className="inline-block"
+                >
+                  {project.likes || 0} likes
+                </motion.span>
+              </AnimatePresence>
             </div>
           </div>
 
@@ -189,29 +216,51 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
           <div className="grid grid-cols-12 gap-2">
             <button
               onClick={(e) => handleVisitOrDownload(e, isWeb ? 'clicks' : 'downloads')}
-              className="col-span-8 px-4 py-2 rounded-xl text-xs font-semibold bg-gray-900 dark:bg-slate-100 text-white dark:text-gray-900 hover:bg-indigo-600 dark:hover:bg-indigo-600 dark:hover:text-white hover:text-white transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
+              className="col-span-6 px-3 py-2 rounded-xl text-xs font-semibold bg-gray-900 dark:bg-slate-100 text-white dark:text-gray-900 hover:bg-indigo-600 dark:hover:bg-indigo-600 dark:hover:text-white hover:text-white transition-all shadow-sm flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
               id={`project-card-action-${type}-${project.id}`}
             >
               {isWeb ? (
                 <>
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Visit Website</span>
+                  <span>Visit</span>
                 </>
               ) : (
                 <>
                   <Download className={`w-3.5 h-3.5 ${downloadProgress !== null ? 'animate-bounce' : ''}`} />
                   <span>
                     {downloadProgress !== null 
-                      ? `Assembling (${downloadProgress}%)` 
-                      : 'Download APK'}
+                      ? `${downloadProgress}%` 
+                      : 'Download'}
                   </span>
                 </>
               )}
             </button>
 
+            {/* Heart Like action button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLike?.(project.id, type);
+              }}
+              className={`col-span-2 p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer ${
+                userLikes.includes(project.id)
+                  ? 'border-rose-500/50 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                  : 'border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50/50 dark:hover:bg-rose-950/20'
+              }`}
+              title={userLikes.includes(project.id) ? "Unlike Project" : "Like Project"}
+              id={`project-card-like-${type}-${project.id}`}
+            >
+              <motion.div
+                whileTap={{ scale: 1.4 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+              >
+                <Heart className={`w-3.5 h-3.5 ${userLikes.includes(project.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
+              </motion.div>
+            </button>
+
             <button
               onClick={handleShare}
-              className="col-span-2 p-2 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center"
+              className="col-span-2 p-2 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
               title="Share Project"
               id={`project-card-share-${type}-${project.id}`}
             >
@@ -224,7 +273,7 @@ export default function ProjectCard({ project, type, onViewDetails, onIncrementC
                 onViewDetails(project, type);
                 onIncrementCount(project.id, type, 'views');
               }}
-              className="col-span-2 p-2 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center"
+              className="col-span-2 p-2 rounded-xl border border-gray-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
               title="View Details"
               id={`project-card-details-${type}-${project.id}`}
             >

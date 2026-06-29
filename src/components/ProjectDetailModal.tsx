@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Website, App, Feedback } from '../types';
-import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode, Copy, Check, Clock, MessageSquare, Send } from 'lucide-react';
+import { Website, App, Feedback, Comment } from '../types';
+import { X, Globe, Download, Eye, ExternalLink, Share2, Star, Calendar, ShieldCheck, Smartphone, QrCode, Copy, Check, Clock, MessageSquare, Send, LogIn, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAndReassembleApk, downloadBase64File } from '../utils/apkDownloader';
+import { signInWithGoogle } from '../firebase';
 
 interface ProjectDetailModalProps {
   project: Website | App | null;
@@ -12,6 +13,9 @@ interface ProjectDetailModalProps {
   onShowToast?: (message: string, type: 'success' | 'info' | 'error' | 'download') => void;
   feedbacks: Feedback[];
   onSubmitFeedback: (name: string, rating: number, comment: string) => Promise<void>;
+  user: any;
+  comments: Comment[];
+  onPostComment: (projectId: string, projectName: string, projectType: 'website' | 'app', text: string) => Promise<void>;
 }
 
 export default function ProjectDetailModal({ 
@@ -21,10 +25,20 @@ export default function ProjectDetailModal({
   onIncrementCount, 
   onShowToast,
   feedbacks = [],
-  onSubmitFeedback
+  onSubmitFeedback,
+  user,
+  comments = [],
+  onPostComment
 }: ProjectDetailModalProps) {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [showQr, setShowQr] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(0);
+
+  const openLightbox = (idx: number) => {
+    setLightboxIdx(idx);
+    setLightboxOpen(true);
+  };
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [fbName, setFbName] = useState('');
@@ -32,6 +46,22 @@ export default function ProjectDetailModal({
   const [fbHoverRating, setFbHoverRating] = useState<number | null>(null);
   const [fbComment, setFbComment] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || !project) return;
+    setSubmittingComment(true);
+    try {
+      await onPostComment(project.id, project.name, type === 'website' ? 'website' : 'app', commentText.trim());
+      setCommentText('');
+    } catch (error) {
+      console.error("Error posting comment:", error);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,24 +132,35 @@ export default function ProjectDetailModal({
   };
 
   // Generate QR Code URL
-  const qrTargetUrl = isWeb 
-    ? webProj.url 
-    : (appProj.apkUrl && appProj.apkUrl.startsWith('chunks://') 
-        ? `${window.location.origin}${window.location.pathname}#app-${appProj.id}` 
-        : appProj.apkUrl);
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl || '')}`;
+  const qrTargetUrl = `${window.location.origin}${window.location.pathname}#${type}-${project.id}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
   // Share action
   const handleShare = () => {
-    const shareUrl = window.location.href;
-    const title = `Check out ${project.name} on Mohamad Osiullah's Showcase!`;
+    const directUrl = `${window.location.origin}${window.location.pathname}#${type}-${project.id}`;
+    const title = `Check out ${project.name} - Mohamad Osiullah`;
+    const text = project.description || `Check out ${project.name} on Mohamad Osiullah's Platform.`;
+    
     if (navigator.share) {
-      navigator.share({ title, text: project.description, url: shareUrl }).catch(err => {
-        console.log('Error sharing:', err);
+      navigator.share({
+        title,
+        text,
+        url: directUrl
+      })
+      .then(() => {
+        onShowToast?.('Shared successfully!', 'success');
+      })
+      .catch(err => {
+        console.log('Error sharing via Web Share API:', err);
       });
     } else {
-      navigator.clipboard.writeText(`${shareUrl}#${type}-${project.id}`);
-      alert(`Project link copied to clipboard!`);
+      navigator.clipboard.writeText(directUrl).then(() => {
+        setCopied(true);
+        onShowToast?.('Project link copied to clipboard!', 'success');
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(err => {
+        console.error('Failed to copy link:', err);
+      });
     }
   };
 
@@ -238,50 +279,56 @@ export default function ProjectDetailModal({
                   </p>
                 </div>
 
-                {/* Screenshots Gallery */}
+                {/* Enhanced Horizontal Screenshots Gallery */}
                 {screenshots.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono mb-3">
-                      Screenshots Gallery
-                    </h3>
-                    
-                    {/* Active Screenshot container */}
-                    <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-150 dark:bg-slate-950 border border-gray-200/50 dark:border-slate-800/80">
-                      <img
-                        src={screenshots[activeImageIdx]}
-                        alt={`${project.name} active preview`}
-                        className="w-full h-full object-cover transition-all"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80';
-                        }}
-                      />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">
+                        Screenshots Gallery
+                      </h3>
+                      {screenshots.length > 1 && (
+                        <span className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded-md">
+                          {screenshots.length} Images • Scroll Horizontally →
+                        </span>
+                      )}
                     </div>
-
-                    {/* Image Thumbnails row */}
-                    {screenshots.length > 1 && (
-                      <div className="flex gap-2 overflow-x-auto py-2 mt-2">
-                        {screenshots.map((shot, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setActiveImageIdx(idx)}
-                            className={`relative w-20 h-12 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${
-                              activeImageIdx === idx ? 'border-indigo-600' : 'border-transparent opacity-60 hover:opacity-100'
-                            }`}
-                          >
-                            <img
-                              src={shot}
-                              alt="thumbnail"
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=150&q=80';
-                              }}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    
+                    {/* Horizontal scrollable row */}
+                    <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x scroll-smooth no-scrollbar" id="screenshots-horizontal-row">
+                      {screenshots.map((shot, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => openLightbox(idx)}
+                          className="relative w-64 sm:w-72 aspect-video rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-gray-200/50 dark:border-slate-800/80 shrink-0 cursor-pointer snap-start group shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <img
+                            src={shot}
+                            alt={`${project.name} preview ${idx + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80';
+                            }}
+                          />
+                          {/* Hover Overlay with Zoom icon */}
+                          <div className="absolute inset-0 bg-slate-950/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                            <motion.div
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              whileHover={{ scale: 1 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="p-2.5 rounded-full bg-white/10 border border-white/20 text-white backdrop-blur-md shadow-lg"
+                            >
+                              <ZoomIn className="w-5 h-5 text-white" />
+                            </motion.div>
+                          </div>
+                          
+                          {/* Small Index badge on bottom right */}
+                          <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-[10px] font-mono text-white/80 border border-white/5 opacity-80 group-hover:opacity-100 transition-opacity">
+                            {idx + 1} / {screenshots.length}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -436,6 +483,125 @@ export default function ProjectDetailModal({
                             </div>
                           ))}
                         </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* ------------------------------------------------------------- */}
+                {/* Real-time Project Comments Section */}
+                {/* ------------------------------------------------------------- */}
+                <div className="p-5 rounded-2xl bg-indigo-50/10 dark:bg-indigo-950/5 border border-indigo-150/15 dark:border-indigo-900/10 space-y-5 mt-6" id="discussion-section">
+                  <div className="flex items-center gap-2 border-b border-gray-200/20 pb-3">
+                    <MessageSquare className="w-4 h-4 text-indigo-500" />
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-widest font-mono">
+                        Real-time Discussion
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        Authenticated live chat and project feedback
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Comment Form or Sign-in Prompt */}
+                  {user ? (
+                    <form onSubmit={handleCommentSubmit} className="flex gap-3" id="post-comment-form">
+                      <div className="w-8 h-8 rounded-full overflow-hidden border border-indigo-200 dark:border-slate-850 shrink-0 bg-slate-100">
+                        <img 
+                          src={user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user.displayName || 'Anon'}`} 
+                          alt={user.displayName || 'Avatar'} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono">
+                          Posting as <span className="text-indigo-600 dark:text-indigo-400">{user.displayName || user.email}</span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Type a comment or ask a question..."
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                            className="block w-full pl-3 pr-10 py-2.5 text-xs bg-white dark:bg-slate-900 border border-gray-250 dark:border-slate-800 rounded-xl font-sans placeholder-slate-400 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                          />
+                          <button
+                            type="submit"
+                            disabled={submittingComment}
+                            className="absolute right-1 top-1 bottom-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            <Send className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-gray-55/30 dark:bg-slate-950/40 border border-gray-200/50 dark:border-slate-850/50 text-center space-y-2.5" id="login-to-comment">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal font-sans">
+                        To keep this showcase safe and secure, only authenticated Google profiles can post comments.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await signInWithGoogle();
+                          } catch (err) {
+                            console.error('Sign-in failed', err);
+                          }
+                        }}
+                        className="mx-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-mono font-bold uppercase tracking-wider rounded-lg flex items-center gap-1.5 shadow-sm hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>Sign In with Google</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Comments list */}
+                  {(() => {
+                    const projectComments = comments.filter(c => c.projectId === project.id);
+                    return (
+                      <div className="space-y-3 pt-3 border-t border-gray-200/10" id="comments-list-section">
+                        <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">
+                          Project Comments ({projectComments.length})
+                        </h4>
+                        
+                        {projectComments.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 italic text-center py-4 font-mono">
+                            No comments posted yet. Be the first to start the discussion!
+                          </p>
+                        ) : (
+                          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                            {projectComments.map(c => (
+                              <div key={c.id} className="p-3.5 rounded-xl bg-white/40 dark:bg-slate-900/40 border border-gray-200/30 dark:border-slate-850/30 flex gap-3 text-left">
+                                <div className="w-7 h-7 rounded-full overflow-hidden border border-gray-200/50 dark:border-slate-850 shrink-0 bg-slate-100">
+                                  <img 
+                                    src={c.userPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${c.userName}`} 
+                                    alt={c.userName} 
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-bold text-slate-850 dark:text-slate-200 leading-none">
+                                      {c.userName}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-mono">
+                                      {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 font-sans leading-relaxed">
+                                    {c.text}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -642,6 +808,90 @@ export default function ProjectDetailModal({
           </div>
 
         </motion.div>
+
+        {/* Full-screen Lightbox overlay */}
+        <AnimatePresence>
+          {lightboxOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] bg-black/95 flex flex-col items-center justify-center p-4"
+              id="lightbox-overlay"
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors z-[120] cursor-pointer"
+                aria-label="Close Lightbox"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Navigation Left Button */}
+              {screenshots.length > 1 && (
+                <button
+                  onClick={() => setLightboxIdx((lightboxIdx - 1 + screenshots.length) % screenshots.length)}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors z-[120] cursor-pointer"
+                  aria-label="Previous Image"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
+
+              {/* Navigation Right Button */}
+              {screenshots.length > 1 && (
+                <button
+                  onClick={() => setLightboxIdx((lightboxIdx + 1) % screenshots.length)}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/5 hover:bg-white/15 text-white border border-white/5 transition-colors z-[120] cursor-pointer"
+                  aria-label="Next Image"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              )}
+
+              {/* Main Lightbox Image Frame */}
+              <div className="relative max-w-5xl max-h-[75vh] w-full h-full flex items-center justify-center p-4">
+                <motion.img
+                  key={lightboxIdx}
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                  src={screenshots[lightboxIdx]}
+                  alt={`${project.name} expanded preview ${lightboxIdx + 1}`}
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10 select-none"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              {/* Lightbox Footer text & indicators */}
+              <div className="absolute bottom-6 left-0 right-0 text-center text-white/80 select-none z-[120]">
+                <span className="text-xs font-mono bg-white/10 border border-white/10 px-3 py-1 rounded-full">
+                  Screenshot {lightboxIdx + 1} of {screenshots.length}
+                </span>
+                
+                {/* Indicators bullets */}
+                {screenshots.length > 1 && (
+                  <div className="flex gap-2 justify-center mt-4">
+                    {screenshots.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setLightboxIdx(i)}
+                        className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
+                          lightboxIdx === i 
+                            ? 'bg-indigo-500 scale-125 shadow-lg shadow-indigo-500/50' 
+                            : 'bg-white/30 hover:bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </AnimatePresence>
   );

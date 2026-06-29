@@ -21,6 +21,7 @@ import {
   increment, 
   query, 
   orderBy, 
+  where,
   serverTimestamp 
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -35,7 +36,9 @@ import {
   Contact, 
   AnalyticsStats,
   Subscriber,
-  Feedback
+  Feedback,
+  Comment,
+  Like
 } from './types';
 
 // APK Chunking utilities
@@ -65,7 +68,7 @@ import LoginModal from './components/LoginModal';
 import FeedbackSlider from './components/FeedbackSlider';
 
 // Icons
-import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search, Megaphone, Bell, Info, AlertTriangle, CheckCircle2, Download, Check, AlertCircle } from 'lucide-react';
+import { Globe, Smartphone, Sparkles, Calendar, Mail, Compass, Star, ChevronRight, Lock, Laptop, ArrowUp, Search, Megaphone, Bell, Info, AlertTriangle, CheckCircle2, Download, Check, AlertCircle, RotateCcw, Eye } from 'lucide-react';
 
 // Framer Motion staggered animation configurations
 const gridContainerVariants = {
@@ -109,6 +112,7 @@ export default function App() {
   const [appSort, setAppSort] = useState<'newest' | 'popularity' | 'rating'>('newest');
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [visitorStats, setVisitorStats] = useState<{ country: string, countryCode: string, count: number }[]>([]);
 
   const currentSectionRef = useRef('home');
   useEffect(() => {
@@ -158,6 +162,8 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [userLikes, setUserLikes] = useState<string[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsStats>({
     visitors: 0, clicks: 0, downloads: 0, views: 0, dailyLogs: {}
   });
@@ -378,6 +384,17 @@ export default function App() {
       console.warn('Feedbacks listener offline', err);
     });
 
+    // 6.6. Listen to Project Comments
+    const unsubComments = onSnapshot(query(collection(db, 'comments'), orderBy('createdAt', 'desc')), (snap) => {
+      const commentsList: Comment[] = [];
+      snap.forEach(docSnap => {
+        commentsList.push({ id: docSnap.id, ...docSnap.data() } as Comment);
+      });
+      setComments(commentsList);
+    }, (err) => {
+      console.warn('Comments listener offline', err);
+    });
+
     return () => {
       unsubPortfolio();
       unsubWebsites();
@@ -386,7 +403,30 @@ export default function App() {
       unsubAnnouncements();
       unsubAnalytics();
       unsubFeedbacks();
+      unsubComments();
     };
+  }, [user]);
+
+  // 6.7. Listen to User Likes (to highlight liked hearts)
+  useEffect(() => {
+    if (!user) {
+      setUserLikes([]);
+      return;
+    }
+    const q = query(collection(db, 'likes'), where('userId', '==', user.uid));
+    const unsubLikes = onSnapshot(q, (snap) => {
+      const likedIds: string[] = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data && data.projectId) {
+          likedIds.push(data.projectId);
+        }
+      });
+      setUserLikes(likedIds);
+    }, (err) => {
+      console.warn('Likes listener offline', err);
+    });
+    return () => unsubLikes();
   }, [user]);
 
   // 7. Listen to Contact messages (Only if logged in as Admin)
@@ -455,6 +495,73 @@ export default function App() {
       }
     };
     cleanObsoleteWelcomeAnnouncement();
+  }, []);
+
+  // Capture visitor geo-location once per session
+  useEffect(() => {
+    const recordVisit = async () => {
+      try {
+        const tracked = sessionStorage.getItem('portfolio_visit_tracked_v2');
+        if (tracked) return;
+
+        let country = 'Unknown';
+        let countryCode = '';
+        try {
+          const res = await fetch('https://ipapi.co/json/');
+          if (res.ok) {
+            const data = await res.json();
+            country = data.country_name || 'Unknown';
+            countryCode = data.country_code || '';
+          } else {
+            const fallbackRes = await fetch('https://ipinfo.io/json');
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              country = data.country || 'Unknown';
+              countryCode = data.countryCode || '';
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Primary geoloc failed, trying fallback:', fetchErr);
+        }
+
+        if (country && country !== 'Unknown') {
+          await addDoc(collection(db, 'visitors'), {
+            country,
+            countryCode,
+            createdAt: serverTimestamp()
+          });
+          sessionStorage.setItem('portfolio_visit_tracked_v2', 'true');
+        }
+      } catch (err) {
+        console.error('Error tracking visitor geo-location:', err);
+      }
+    };
+
+    recordVisit();
+  }, []);
+
+  // Listen to visitor geo-location stats
+  useEffect(() => {
+    const unsubVisitors = onSnapshot(collection(db, 'visitors'), (snap) => {
+      const counts: Record<string, { country: string, countryCode: string, count: number }> = {};
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const country = data.country || 'Unknown';
+        const code = data.countryCode || '';
+        if (country && country !== 'Unknown') {
+          if (!counts[country]) {
+            counts[country] = { country, countryCode: code, count: 0 };
+          }
+          counts[country].count += 1;
+        }
+      });
+      const sortedStats = Object.values(counts).sort((a, b) => b.count - a.count);
+      setVisitorStats(sortedStats);
+    }, (err) => {
+      console.warn('Visitors stats offline:', err);
+    });
+
+    return () => unsubVisitors();
   }, []);
 
   // Handle direct links via URL hash
@@ -702,6 +809,93 @@ export default function App() {
       });
     } catch (error) {
       console.warn('Real-time counter increment error', error);
+    }
+  };
+
+  const handleToggleLike = async (projectId: string, type: 'website' | 'app') => {
+    if (!user) {
+      try {
+        const loggedUser = await signInWithGoogle();
+        if (loggedUser) {
+          addToast(`Signed in as ${loggedUser.displayName}! Please tap the heart again to like.`, 'success');
+        }
+      } catch (err) {
+        addToast('Sign-in failed. Please authenticate via Google to like projects.', 'error');
+      }
+      return;
+    }
+
+    const isAlreadyLiked = userLikes.includes(projectId);
+    const likeDocId = `${user.uid}_${projectId}`;
+    const likeDocRef = doc(db, 'likes', likeDocId);
+    const projectColl = type === 'website' ? 'websites' : 'apps';
+    const projectDocRef = doc(db, projectColl, projectId);
+
+    try {
+      if (isAlreadyLiked) {
+        // Unlike
+        await deleteDoc(likeDocRef);
+        await updateDoc(projectDocRef, {
+          likes: increment(-1)
+        });
+        addToast('Appreciation removed.', 'info');
+      } else {
+        // Like
+        const likePayload: Like = {
+          id: likeDocId,
+          projectId,
+          userId: user.uid,
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(likeDocRef, likePayload);
+        await updateDoc(projectDocRef, {
+          likes: increment(1)
+        });
+        addToast('Thank you for your appreciation!', 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      addToast('Failed to save like appreciation.', 'error');
+    }
+  };
+
+  const handlePostComment = async (projectId: string, projectName: string, projectType: 'website' | 'app', text: string) => {
+    if (!user) {
+      addToast('Please sign in to post a comment.', 'error');
+      return;
+    }
+    const commentId = `comment-${Date.now()}`;
+    const commentPath = `comments/${commentId}`;
+    try {
+      const payload: Comment = {
+        id: commentId,
+        projectId,
+        projectName,
+        projectType,
+        userId: user.uid,
+        userName: user.displayName || user.email || 'Anonymous',
+        userPhoto: user.photoURL || undefined,
+        text,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'comments', commentId), payload);
+      addToast('Your comment was posted!', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, commentPath);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!isAdmin) {
+      addToast('Unauthorized access. Admin privileges required.', 'error');
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'comments', commentId));
+      addToast('Comment deleted by admin.', 'success');
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      addToast('Failed to delete comment.', 'error');
     }
   };
 
@@ -1107,6 +1301,8 @@ export default function App() {
             onDeleteContact={handleDeleteContact}
             onDeleteSubscriber={handleDeleteSubscriber}
             onDeleteFeedback={handleDeleteFeedback}
+            comments={comments}
+            onDeleteComment={handleDeleteComment}
           />
         </main>
 
@@ -1243,6 +1439,8 @@ export default function App() {
                           onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                           onIncrementCount={handleIncrementCount}
                           onShowToast={addToast}
+                          onToggleLike={handleToggleLike}
+                          userLikes={userLikes}
                         />
                       </div>
                     );
@@ -1286,6 +1484,45 @@ export default function App() {
                 </div>
               </div>
 
+              {/* PORTFOLIO SCALE SUMMARY ROW */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12" id="portfolio-scale-summary">
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-slate-800/50 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-bold font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Web Platforms</span>
+                    <span className="text-2xl sm:text-3xl font-display font-extrabold text-indigo-600 dark:text-indigo-400 mt-1 block">
+                      {websites.length}
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-slate-800/50 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-bold font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Mobile Software</span>
+                    <span className="text-2xl sm:text-3xl font-display font-extrabold text-purple-600 dark:text-purple-400 mt-1 block">
+                      {apps.length}
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-gray-200/50 dark:border-slate-800/50 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                  <div>
+                    <span className="text-[10px] font-bold font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Total Engagement</span>
+                    <span className="text-2xl sm:text-3xl font-display font-extrabold text-amber-500 dark:text-amber-400 mt-1 block">
+                      {[...websites, ...apps].reduce((sum, p) => sum + (p.views || 0), 0).toLocaleString()} <span className="text-xs text-slate-400 dark:text-slate-500 font-sans font-medium">Views</span>
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-500 dark:text-amber-400">
+                    <Eye className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
+
               {/* Websites Grid */}
               {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="websites-skeleton-grid">
@@ -1310,6 +1547,8 @@ export default function App() {
                         onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                         onIncrementCount={handleIncrementCount}
                         onShowToast={addToast}
+                        onToggleLike={handleToggleLike}
+                        userLikes={userLikes}
                       />
                     </motion.div>
                   ))}
@@ -1317,7 +1556,13 @@ export default function App() {
               )}
 
               {sortedWebsites.length === 0 && (
-                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-websites">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-center justify-center text-center py-16 px-6 bg-gradient-to-b from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 border border-slate-200/50 dark:border-slate-800/50 rounded-3xl max-w-xl mx-auto shadow-xl shadow-indigo-500/5 backdrop-blur-md" 
+                  id="empty-state-websites"
+                >
                   <div className="relative mb-6">
                     {/* Glowing Radar Waves */}
                     <div className="absolute -inset-4 bg-indigo-500/10 rounded-full blur-xl animate-pulse" />
@@ -1326,20 +1571,21 @@ export default function App() {
                       <Search className="w-4 h-4 absolute -bottom-1 -right-1 text-amber-500 bg-white dark:bg-slate-950 rounded-full p-0.5 border border-amber-300 dark:border-amber-800" />
                     </div>
                   </div>
-                  <h3 className="font-display font-bold text-lg text-slate-850 dark:text-slate-100">
+                  <h3 className="font-display font-extrabold text-xl text-slate-850 dark:text-slate-100 tracking-tight">
                     {t.noWebsites}
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm font-sans leading-relaxed">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2.5 max-w-sm font-sans leading-relaxed">
                     We couldn't find any hosted web apps matching <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">"{searchQuery}"</span>. Please try refining your query or resetting filters.
                   </p>
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all active:scale-95 cursor-pointer"
+                    className="mt-8 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-sans font-semibold text-sm rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
                   >
-                    Clear Search Query
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Clear Filters</span>
                   </button>
-                </div>
+                </motion.div>
               )}
 
             </div>
@@ -1404,6 +1650,8 @@ export default function App() {
                         onViewDetails={(p, t) => { setSelectedProject(p); setSelectedType(t); }}
                         onIncrementCount={handleIncrementCount}
                         onShowToast={addToast}
+                        onToggleLike={handleToggleLike}
+                        userLikes={userLikes}
                       />
                     </motion.div>
                   ))}
@@ -1411,7 +1659,13 @@ export default function App() {
               )}
 
               {sortedApps.length === 0 && (
-                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white/45 dark:bg-slate-900/45 border border-dashed border-gray-200 dark:border-slate-800 rounded-3xl max-w-xl mx-auto shadow-sm animate-fade-in" id="empty-state-apps">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-center justify-center text-center py-16 px-6 bg-gradient-to-b from-white/60 to-white/30 dark:from-slate-900/60 dark:to-slate-900/30 border border-slate-200/50 dark:border-slate-800/50 rounded-3xl max-w-xl mx-auto shadow-xl shadow-indigo-500/5 backdrop-blur-md" 
+                  id="empty-state-apps"
+                >
                   <div className="relative mb-6">
                     {/* Glowing Radar Waves */}
                     <div className="absolute -inset-4 bg-indigo-500/10 rounded-full blur-xl animate-pulse" />
@@ -1420,21 +1674,140 @@ export default function App() {
                       <Search className="w-4 h-4 absolute -bottom-1 -right-1 text-amber-500 bg-white dark:bg-slate-950 rounded-full p-0.5 border border-amber-300 dark:border-amber-800" />
                     </div>
                   </div>
-                  <h3 className="font-display font-bold text-lg text-slate-850 dark:text-slate-100">
+                  <h3 className="font-display font-extrabold text-xl text-slate-850 dark:text-slate-100 tracking-tight">
                     No Application Packages Found
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm font-sans leading-relaxed">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-2.5 max-w-sm font-sans leading-relaxed">
                     No compiled Android packages match <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">"{searchQuery}"</span>. Clear search to show the full mobile software directory.
                   </p>
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-xl shadow-md shadow-indigo-500/10 transition-all active:scale-95 cursor-pointer"
+                    className="mt-8 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-sans font-semibold text-sm rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
                   >
-                    Clear Search Query
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Clear Filters</span>
                   </button>
-                </div>
+                </motion.div>
               )}
+
+            </div>
+          </section>
+
+          {/* GLOBAL PRESENCE SECTION */}
+          <section className="py-20 relative bg-indigo-50/10 dark:bg-slate-900/10 border-t border-b border-gray-150/50 dark:border-slate-800/30 overflow-hidden" id="global-presence">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              
+              <div className="text-center max-w-xl mx-auto mb-12 reveal-on-scroll">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono tracking-widest uppercase flex items-center justify-center gap-1.5">
+                  <Globe className="w-4 h-4 animate-spin-slow text-indigo-500" />
+                  <span>Audience Demographics</span>
+                </span>
+                <h2 className="font-display font-extrabold text-3xl text-slate-900 dark:text-white mt-1">
+                  Global Footprint
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-sans mt-2.5">
+                  Real-time visualization of visitor country origins using light-weight geo-location.
+                </p>
+              </div>
+
+              {/* Visualized Layout: Left simple map-like graphics/bars, Right Country List */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                
+                {/* Left: Interactive Progress List */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-850 shadow-sm">
+                    <h3 className="font-sans font-bold text-slate-800 dark:text-white text-base mb-4 flex items-center justify-between">
+                      <span>Top Country Distribution</span>
+                      <span className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">
+                        {visitorStats.reduce((sum, item) => sum + item.count, 0)} Total Visitors
+                      </span>
+                    </h3>
+                    
+                    {visitorStats.length === 0 ? (
+                      <div className="text-center py-10 text-slate-400 dark:text-slate-500 font-mono text-xs">
+                        Capturing visitor data...
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                        {visitorStats.slice(0, 5).map((item, index) => {
+                          const total = visitorStats.reduce((sum, x) => sum + x.count, 0);
+                          const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                          return (
+                            <div key={item.country} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                  <span className="w-4 text-slate-400 font-mono">#{index + 1}</span>
+                                  {item.countryCode ? (
+                                    <img 
+                                      src={`https://flagcdn.com/24x18/${item.countryCode.toLowerCase()}.png`} 
+                                      alt={item.country}
+                                      className="inline-block w-4 h-3 rounded shadow-sm"
+                                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                                    />
+                                  ) : null}
+                                  <span>{item.country}</span>
+                                </span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                  {item.count} ({percentage}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  whileInView={{ width: `${percentage}%` }}
+                                  viewport={{ once: true }}
+                                  transition={{ duration: 1, ease: "easeOut" }}
+                                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Map-like Decorative Data Card */}
+                <div className="lg:col-span-5">
+                  <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 rounded-3xl border border-indigo-950 shadow-xl relative overflow-hidden h-[280px] flex flex-col justify-between">
+                    {/* Decorative map grid background */}
+                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+                    
+                    <div className="relative z-10">
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase bg-white/10 text-indigo-200 border border-white/5">
+                        Operational Reach
+                      </span>
+                      <h4 className="font-display font-extrabold text-2xl mt-3 leading-tight">
+                        Connecting with developers worldwide.
+                      </h4>
+                    </div>
+
+                    <div className="relative z-10 flex items-center gap-4 border-t border-white/10 pt-4 mt-6">
+                      <div className="text-left">
+                        <div className="text-2xl font-mono font-extrabold text-amber-400">
+                          {visitorStats.length}
+                        </div>
+                        <div className="text-[10px] uppercase font-mono font-semibold text-slate-400 tracking-wider">
+                          Countries Tracked
+                        </div>
+                      </div>
+                      <div className="h-8 w-[1px] bg-white/10" />
+                      <div className="text-left">
+                        <div className="text-2xl font-mono font-extrabold text-emerald-400">
+                          Nepal
+                        </div>
+                        <div className="text-[10px] uppercase font-mono font-semibold text-slate-400 tracking-wider">
+                          Primary HQ Location
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
 
             </div>
           </section>
@@ -1524,6 +1897,9 @@ export default function App() {
         onShowToast={addToast}
         feedbacks={feedbacks}
         onSubmitFeedback={handleSubmitFeedback}
+        user={user}
+        comments={comments}
+        onPostComment={handlePostComment}
       />
 
       {/* 6. ADMIN SECURITY LOGIN GATEWAY */}

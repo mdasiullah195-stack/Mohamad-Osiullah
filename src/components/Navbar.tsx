@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Sun, Moon, Lock, ShieldCheck, Menu, X, LogOut, Settings } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { Language, translations } from '../utils/translations';
@@ -37,6 +37,14 @@ export default function Navbar({
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchExpanded && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [searchExpanded]);
 
   const t = translations[language];
 
@@ -85,57 +93,82 @@ export default function Navbar({
 
             {/* Desktop Nav Links */}
             <div className="hidden lg:flex items-center gap-1">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onNavigate(item.id);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                    currentSection === item.id
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
-                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                  id={`nav-link-${item.id}`}
-                >
-                  <span>{item.label}</span>
-                  {currentSection !== item.id && (
-                    <span className="absolute bottom-1 left-4 right-4 h-[2px] bg-indigo-600 dark:bg-indigo-400 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100" />
-                  )}
-                </button>
-              ))}
+              {navItems.map((item) => {
+                const isActive = currentSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onNavigate(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      isActive
+                        ? 'text-indigo-700 dark:text-indigo-400 font-semibold bg-indigo-50/50 dark:bg-indigo-950/30'
+                        : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    id={`nav-link-${item.id}`}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`absolute bottom-1 left-4 right-4 h-[2px] bg-indigo-600 dark:bg-indigo-400 transition-transform duration-300 origin-left ${
+                      isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                    }`} />
+                  </button>
+                );
+              })}
             </div>
-          </div>
-
-          {/* Search Box */}
-          <div className="hidden sm:block relative max-w-xs w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className={`w-4 h-4 transition-colors ${searchFocused ? 'text-indigo-500' : 'text-gray-400'}`} />
-            </div>
-            <input
-              type="text"
-              placeholder={t.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              className="block w-full pl-9 pr-4 py-1.5 text-sm bg-gray-100/80 dark:bg-slate-800/70 border border-transparent focus:border-indigo-500/50 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500/10 text-gray-900 dark:text-white transition-all duration-300 placeholder-gray-400 dark:placeholder-slate-500"
-              id="global-search-input"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-white"
-                id="search-clear-btn"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
 
           {/* Action Icons Section */}
           <div className="flex items-center gap-2">
+            
+            {/* Sliding Search Bar (All Screens) */}
+            <div className="relative flex items-center" id="sliding-search-container">
+              <motion.div
+                initial={false}
+                animate={{
+                  width: searchExpanded ? 160 : 0,
+                  opacity: searchExpanded ? 1 : 0
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                className="overflow-hidden relative flex items-center"
+              >
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder={t.searchPlaceholder || "Search..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  className="pl-3 pr-8 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 rounded-full focus:outline-none text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 w-full"
+                  id="sliding-search-input"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+                    id="sliding-search-clear-btn"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </motion.div>
+              
+              <button
+                onClick={() => setSearchExpanded(!searchExpanded)}
+                className={`p-2 rounded-lg transition-all cursor-pointer ${
+                  searchExpanded 
+                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30' 
+                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800'
+                }`}
+                title="Search Projects"
+                id="sliding-search-trigger"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+            </div>
+
             {/* Language Switcher Toggle */}
             <button
               onClick={() => onLanguageChange(language === 'EN' ? 'NE' : 'EN')}
@@ -215,81 +248,88 @@ export default function Navbar({
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="lg:hidden glass border-t border-gray-200 dark:border-slate-800 py-4 px-4 flex flex-col gap-2 overflow-hidden shadow-xl"
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ 
+              scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] },
+              opacity: { duration: 0.2, ease: "easeOut" },
+              y: { duration: 0.25, ease: "easeOut" }
+            }}
+            className="lg:hidden relative mx-auto max-w-sm w-[calc(100%-2rem)] mt-2 p-4 flex flex-col gap-1 rounded-2xl border border-white/30 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/75 backdrop-blur-2xl shadow-xl shadow-indigo-500/10 overflow-hidden"
             id="mobile-dropdown-menu"
           >
+            {/* Liquid Background Glow Blobs */}
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full filter blur-2xl pointer-events-none animate-pulse" style={{ animationDuration: '4s' }} />
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-gradient-to-tr from-amber-500/15 to-emerald-500/15 rounded-full filter blur-2xl pointer-events-none animate-pulse" style={{ animationDuration: '6s' }} />
+
+            {/* Premium Mini-Window Notch Accent */}
+            <div className="relative z-10 w-12 h-1 bg-slate-300/80 dark:bg-slate-700/80 rounded-full mx-auto mb-2.5 pointer-events-none" />
             
-            {/* Mobile Search Input */}
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder={t.searchProjects}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-150 dark:bg-slate-800 border border-transparent focus:border-amber-500 rounded-lg text-gray-900 dark:text-white"
-              />
-            </div>
+
 
             {/* Navigation Links with animated underlines */}
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`relative w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
-                  currentSection === item.id
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-semibold'
-                    : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                <span>{item.label}</span>
-                {currentSection !== item.id && (
-                  <span className="absolute bottom-1.5 left-3 right-3 h-[2px] bg-indigo-600 dark:bg-indigo-400 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100" />
-                )}
-              </button>
-            ))}
+            <div className="relative z-10 flex flex-col gap-1">
+              {navItems.map((item) => {
+                const isActive = currentSection === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onNavigate(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`relative w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                      isActive
+                        ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 shadow-sm border border-indigo-100/10'
+                        : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`absolute bottom-1 left-3 right-3 h-[2px] bg-indigo-600 dark:bg-indigo-400 transition-transform duration-300 origin-left ${
+                      isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                    }`} />
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Language Switcher Button for Mobile */}
-            <button
-              onClick={() => {
-                onLanguageChange(language === 'EN' ? 'NE' : 'EN');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2 mt-1 border-t border-gray-100 dark:border-slate-800/50 pt-3"
-              id="mobile-language-toggle-btn"
-            >
-              <span className="font-mono text-xs border border-gray-300 dark:border-slate-700 px-1.5 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
-                {language}
-              </span>
-              <span>Toggle Language (EN / NE)</span>
-            </button>
+            <div className="relative z-10">
+              <button
+                onClick={() => {
+                  onLanguageChange(language === 'EN' ? 'NE' : 'EN');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-gray-600 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/40 flex items-center gap-2 mt-0.5 border-t border-gray-200/30 dark:border-slate-800/40 pt-2"
+                id="mobile-language-toggle-btn"
+              >
+                <span className="font-mono text-[10px] border border-gray-300 dark:border-slate-700 px-1 py-0.5 rounded font-extrabold bg-gray-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400">
+                  {language}
+                </span>
+                <span>Toggle Language (EN / NE)</span>
+              </button>
+            </div>
 
             {/* Admin Controls inside Dropdown for Mobile/Tablet views */}
-            <div className="mt-2 pt-3 border-t border-gray-100 dark:border-slate-800/50 flex flex-col gap-2">
-              <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest px-3 mb-1">
+            <div className="relative z-10 mt-1.5 pt-2 border-t border-gray-200/30 dark:border-slate-800/40 flex flex-col gap-1.5">
+              <span className="text-[9px] font-bold font-mono text-slate-400 uppercase tracking-widest px-3 mb-0.5">
                 Administrator Actions
               </span>
               {isAdmin ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <button
                     onClick={() => {
                       onNavigate('admin');
                       setMobileMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold border transition-all ${
                       currentSection === 'admin'
                         ? 'bg-indigo-600 border-indigo-700 text-white shadow-md'
                         : 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/30'
                     }`}
                   >
-                    <ShieldCheck className="w-4 h-4" />
+                    <ShieldCheck className="w-3.5 h-3.5" />
                     <span>Go to Admin Dashboard</span>
                   </button>
                   <button
@@ -297,9 +337,9 @@ export default function Navbar({
                       onLogout();
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all border border-dashed border-rose-200/30 hover:border-rose-400"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all border border-dashed border-rose-200/30 hover:border-rose-400"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-3.5 h-3.5" />
                     <span>Logout Session</span>
                   </button>
                 </div>
@@ -309,10 +349,10 @@ export default function Navbar({
                     onLogin();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-slate-900 transition-all shadow-md"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-slate-900 transition-all shadow-md"
                   id="mobile-admin-login-btn"
                 >
-                  <Lock className="w-4 h-4" />
+                  <Lock className="w-3.5 h-3.5" />
                   <span>Admin Sign In</span>
                 </button>
               )}
